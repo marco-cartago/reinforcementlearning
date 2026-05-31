@@ -28,16 +28,26 @@ def board_fen_to_numpy(fen: str) -> np.ndarray:
     for row in str_rows:
         expanded_str_rows.append([c for c in row])
 
-    for row in str_rows:
+    tabular = []
+    for row in expanded_str_rows:
         new_row = []
         for piece in row:
             if piece.isdigit():
                 new_row += [" "] * int(piece)
             else:
                 new_row += [piece]
-        row = new_row
+        tabular.append(new_row)
 
-    return str_rows
+    arr = np.array(tabular)
+    dct = {
+        "k": -32, "q": -16, "r": -8, "b": -4, "n": -2, "p": -1,
+        "K": 32, "Q": 16, "R": 8, "B": 4, "N": 2, "P": 1,
+        " ": 0
+    }
+    vectorized_ch2num = np.vectorize(lambda x: dct[x])
+    result = vectorized_ch2num(arr)
+
+    return result
 
 
 print(board_fen_to_numpy("1B6/2n5/p1N1P2R/P1K3N1/4Pk2/1Q2p2p/6nP/1B4R1 w - - 0 1"))
