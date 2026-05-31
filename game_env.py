@@ -20,10 +20,13 @@ def calculate_size(fen: str) -> tuple[int, int]:
     return (height, width)
 
 
-def board_fen_to_numpy(fen: str) -> np.ndarray:
+def board_fen_to_numpy(fen: str) -> tuple[np.ndarray, float]:
 
-    str_rows = fen.split()[0].split("/")
+    parts = fen.split()
+    str_rows = parts[0].split("/")
     expanded_str_rows = []
+
+    turn = 1 if parts[1] == "w" else -1
 
     for row in str_rows:
         expanded_str_rows.append([c for c in row])
@@ -47,7 +50,7 @@ def board_fen_to_numpy(fen: str) -> np.ndarray:
     vectorized_ch2num = np.vectorize(lambda x: dct[x])
     result = vectorized_ch2num(arr)
 
-    return result
+    return (result, turn)
 
 
 print(board_fen_to_numpy("1B6/2n5/p1N1P2R/P1K3N1/4Pk2/1Q2p2p/6nP/1B4R1 w - - 0 1"))
