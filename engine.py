@@ -1,6 +1,10 @@
+
+from functools import lru_cache
+
 from gamestate import GameState
 
-MAX_DEPTH = 3
+
+MAX_DEPTH = 2
 
 PIECE_VALUES_CHESS = {
     'K': 100.0, 'Q': 9.0, 'R': 5.0, 'B': 3.0, 'N': 3.0, 'P': 1.0,
@@ -35,6 +39,7 @@ def evaluate_state(state: GameState, piece_values: dict = PIECE_VALUES_CHESS):
     return value
 
 
+@lru_cache(maxsize=None)
 def alphabeta(
     state: GameState,
     depth: int,
@@ -100,7 +105,7 @@ if __name__ == "__main__":
 
     import numpy as np
     s = GameState(variant='shogi')
-    p = 0.8
+    p = 0.01
 
     while (not s.has_ended()) and (len(s.legal_moves) > 0):
 
