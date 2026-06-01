@@ -1,6 +1,6 @@
 from gamestate import GameState
 
-MAX_DEPTH = 5
+MAX_DEPTH = 3
 
 PIECE_VALUES_CHESS = {
     'K': 100.0, 'Q': 9.0, 'R': 5.0, 'B': 3.0, 'N': 3.0, 'P': 1.0,
@@ -97,13 +97,22 @@ def find_best_move(state, depth=MAX_DEPTH, variant=None):
 
 
 if __name__ == "__main__":
+
+    import numpy as np
     s = GameState(variant='shogi')
+    p = 0.8
 
-    while not s.has_ended():
+    while (not s.has_ended()) and (len(s.legal_moves) > 0):
 
-        m, v = find_best_move(s, variant="shogi")
-        print()
+        if p < np.random.rand():
+            m, v = find_best_move(s, variant="shogi")
+            print()
+        else:
+            m = np.random.randint(0, len(s.legal_moves))
+            v = None
 
         s = s.make_action(m)
         print("Value: ", v)
         print(s)
+
+    print(s.move_stack)

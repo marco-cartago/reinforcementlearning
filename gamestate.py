@@ -97,7 +97,8 @@ class GameState():
         self.size = size or calculate_size(self.fen)
 
     def __repr__(self) -> str:
-        return fen_to_repr(self.get_fen())
+        repr = f"{self.get_fen()}\n" + fen_to_repr(self.get_fen())
+        return repr
 
     def get_numpy_state(self) -> np.ndarray:
         board = np.zeros(self.size)
@@ -106,7 +107,9 @@ class GameState():
     def get_numpy_legal_moves(self):
         pass
 
-    def make_action(self, move):
+    def make_action(self, move: int | None):
+        if move is None:
+            return self
         new_move_stack = self.move_stack + [self.legal_moves[move]]
         new_state = GameState(
             variant=self.variant,
