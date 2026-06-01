@@ -1,6 +1,9 @@
 import pyffish as pf
 import numpy as np
 
+WHITE = 1
+BLACK = -1
+
 
 def calculate_size(fen: str) -> tuple[int, int]:
     height = sum([c == "/" for c in fen]) + 1
@@ -78,7 +81,14 @@ def board_numpy_to_fen(arr: np.ndarray) -> str:
     return ""
 
 
-class GameState():
+def calculate_reward(s, a: int, sp) -> float:
+    if sp.has_ended():
+        return float(sp.side_to_move)
+    else:
+        return 0.0
+
+
+class GameState(object):
 
     def __init__(self, variant="gardner", fen=None, moves=None, size=None):
         self.variant = variant
@@ -86,9 +96,9 @@ class GameState():
         self.move_stack = moves or []
 
         self.side_to_move = (
-            1
+            WHITE
             if (self.fen.split(" ")[1] == "w") == (len(self.move_stack) % 2 == 0)
-            else -1
+            else BLACK
         )
 
         self.legal_moves = pf.legal_moves(
@@ -117,6 +127,8 @@ class GameState():
             moves=new_move_stack,
             size=self.size
         )
+
+        reward = calculate_reward(self, move, new_state)
 
         return new_state
 
