@@ -27,7 +27,8 @@ class GridWorld(object):
             sd_treasure = 10,
             sd_small_treasure = 1,
 
-            temperature = 0.1
+            temperature = 0.1,
+            gamma = 0.9
         ):
         self.grid = np.zeros((size, size), dtype=np.int8)
         self.size = size
@@ -38,6 +39,7 @@ class GridWorld(object):
         self.small_treasure_pos: tuple = (0, size-1)
     
         self.step = 0
+        self.gamma = gamma
         
         self.step_penalty = step_penalty
         self.small_treasure_rew = small_treasure_rew
@@ -75,6 +77,7 @@ class GridWorld(object):
             s += str_row + tiles[self.WALL] + "\n"
         
         s += tiles[self.WALL] * (self.size + 2)
+        s +="\n"
 
         return s
 
@@ -112,6 +115,27 @@ class GridWorld(object):
 
         return [move for _, move in actions.items()]
 
+
+    def get_legal_actions(self, state):
+        if self.is_terminated:
+            return []
+        np_pos = np.int8(state)
+        STATE_UP, STATE_DOWN, STATE_LEFT, STATE_RIGHT = np_pos + self.UP, np_pos + self.DOWN, np_pos + self.LEFT, np_pos + self.RIGHT
+        actions = {1: self.UP, 2: self.DOWN, 3: self.LEFT, 4: self.RIGHT}
+       
+        if STATE_UP[1] == self.size or self.grid[STATE_UP[0], STATE_UP[1]] == self.WALL:
+            actions.pop(1)
+       
+        if STATE_DOWN[1] == -1 or self.grid[STATE_DOWN[0], STATE_DOWN[1]] == self.WALL:
+            actions.pop(2)
+       
+        if STATE_LEFT[0] == -1 or self.grid[STATE_LEFT[0], STATE_LEFT[1]] == self.WALL:
+            actions.pop(3)
+       
+        if STATE_RIGHT[0] == self.size or self.grid[STATE_RIGHT[0], STATE_RIGHT[1]] == self.WALL:
+            actions.pop(4)
+
+        return [move for _, move in actions.items()]
 
     def get_episode(self):
         return self.current_episode
@@ -151,6 +175,6 @@ class GridWorld(object):
 
         self.grid[self.agent_pos] = self.AGENT
         self.step += 1
-        self.total_reward += self.step_penalty
+        self.total_reward += self.step_penalty * self.gamma**self.step
         
         return reward
