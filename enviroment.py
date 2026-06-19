@@ -18,7 +18,7 @@ class GridWorld(object):
             self, 
             size=20, 
             p_walls=0.5, 
-            agent_start=(0,0),
+            agent_start=(np.int8(0),np.int8(0)),
 
             step_penalty = -(2**(-10)),
             s_treasure_rew = 1,
@@ -30,9 +30,9 @@ class GridWorld(object):
         self.size = size
         self.p_walls = p_walls
 
-        self.agent_pos = agent_start
-        self.treasure_pos = (size-1, size-1)
-        self.s_treasure_pos = (0, size-1)
+        self.agent_pos: tuple = agent_start
+        self.treasure_pos: tuple = (size-1, size-1)
+        self.s_treasure_pos: tuple = (0, size-1)
     
         self.step = 0
         
@@ -45,7 +45,9 @@ class GridWorld(object):
         self.is_terminated = False
         self.total_reward = 0
 
-        self._init_grid()
+        self.current_episode = []
+
+        self.__init_gridworld()
 
 
     def __str__(self):
@@ -71,7 +73,7 @@ class GridWorld(object):
 
         return s
 
-    def _init_grid(self):
+    def __init_gridworld(self):
         for r in range(self.size):
             for c in range(self.size):
                 if not (r % 2 == 0):
@@ -90,33 +92,53 @@ class GridWorld(object):
         np_pos = np.int8(self.agent_pos)
         STATE_UP, STATE_DOWN, STATE_LEFT, STATE_RIGHT = np_pos + self.UP, np_pos + self.DOWN, np_pos + self.LEFT, np_pos + self.RIGHT
         actions = {1: self.UP, 2: self.DOWN, 3: self.LEFT, 4: self.RIGHT}
+       
         if STATE_UP[1] == self.size or self.grid[STATE_UP[0], STATE_UP[1]] == self.WALL:
             actions.pop(1)
+       
         if STATE_DOWN[1] == -1 or self.grid[STATE_DOWN[0], STATE_DOWN[1]] == self.WALL:
             actions.pop(2)
+       
         if STATE_LEFT[0] == -1 or self.grid[STATE_LEFT[0], STATE_LEFT[1]] == self.WALL:
             actions.pop(3)
+       
         if STATE_RIGHT[0] == self.size or self.grid[STATE_RIGHT[0], STATE_RIGHT[1]] == self.WALL:
             actions.pop(4)
 
         return [move for _, move in actions.items()]
 
+
+    def get_episode(self):
+        return self.current_episode
+
+
     def do_action(self, action):
-        agent_pos = np.int8(self.agent_pos)
-        self.grid[self.agent_pos] = self.EMPTY
-        agent_pos += np.int8(action)
-        self.agent_pos = tuple(agent_pos)
+
+        reward = self.step_penalty
+        curr_agent_pos = self.agent_pos
+
+        curr_agent_pos_np = np.int8(curr_agent_pos)
+        self.grid[curr_agent_pos] = self.EMPTY
+
+        next_agent_pos_np = curr_agent_pos_np + np.int8(action)
+        next_agent_pos = tuple(next_agent_pos_np)
+        self.agent_pos = next_agent_pos
+
         if self.grid[self.agent_pos] == self.TREASURE:
             self.is_terminated = True
-            self.total_reward += self.treasure_rew
-            self.grid[self.agent_pos] = self.AGENT
-            return self.treasure_rew
+            self.total_reward += self.treasure_rew     
+            reward = self.treasure_rew
+        
         if self.grid[self.agent_pos] == self.SMALL_TREASURE:
             self.is_terminated = True
             self.total_reward += self.s_treasure_rew
-            self.grid[self.agent_pos] = self.AGENT
-            return self.s_treasure_rew
+            reward = self.s_treasure_rew
+
+        s_a_s_r = (tuple(curr_agent_pos), tuple(action), tuple(next_agent_pos), reward)
+        self.current_episode.append(s_a_s_r)
+
         self.grid[self.agent_pos] = self.AGENT
         self.step += 1
         self.total_reward += self.step_penalty
-        return self.step_penalty
+        
+        return reward
