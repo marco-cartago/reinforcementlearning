@@ -32,8 +32,20 @@ class GridWorld(object):
         self.grid[self.streasure_pos] = self.SMALL_TREASURE
 
 
-    def get_actions(self):
-        
+    def get_actions(self, pos):
+        np_pos = np.int8(pos)
+        UP, DOWN, LEFT, RIGHT = np_pos + [0,1], np_pos + [0,-1], np_pos + [-1, 0], np_pos + [1, 0]
+        actions = {1: UP, 2: DOWN, 3: LEFT, 4: RIGHT}
+        if UP[1] == self.size or self.grid[UP[0], UP[1]] == self.WALL:
+            actions.pop(1)
+        if DOWN[1] == -1 or self.grid[DOWN[0], DOWN[1]] == self.WALL:
+            actions.pop(2)
+        if LEFT[0] == -1 or self.grid[LEFT[0], LEFT[1]] == self.WALL:
+            actions.pop(3)
+        if RIGHT[0] == self.size or self.grid[RIGHT[0], RIGHT[1]] == self.WALL:
+            actions.pop(4)
+
+        return [move for _, move in actions.items()]
 
     def do_action(self):
         pass
