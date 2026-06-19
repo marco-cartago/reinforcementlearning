@@ -8,6 +8,11 @@ class GridWorld(object):
     TREASURE = 3
     SMALL_TREASURE = 4
 
+    UP = [0, 1]
+    DOWN = [0, -1]
+    LEFT = [-1, 0]
+    RIGHT = [1, 0]
+
 
     def __init__(
             self, 
@@ -15,9 +20,11 @@ class GridWorld(object):
             p_walls=0.5, 
             agent_start=(0,0),
 
-            step_penalty = -1e-3,
+            step_penalty = -(2**(-10)),
             s_treasure_rew = 1,
             treasure_rew = 1_000,
+
+            temperature = 0.1
         ):
         self.grid = np.zeros((size, size), dtype=np.int8)
         self.size = size
@@ -33,20 +40,25 @@ class GridWorld(object):
         self.s_treasure_rew = s_treasure_rew
         self.treasure_rew = treasure_rew
 
+        self.temperature = temperature
+
+        self.is_terminated = False
+        self.total_reward = 0
+
         self._init_grid()
 
 
     def __str__(self):
 
         tiles = {
-            self.EMPTY: " . ",
+            self.EMPTY: " ⋅ ",
             self.WALL: "███",
-            self.AGENT: " a ",
-            self.TREASURE: " T ",
-            self.SMALL_TREASURE: " t ",
+            self.AGENT: "🤖 ",
+            self.TREASURE: "💰 ",
+            self.SMALL_TREASURE: "🪙 ",
         }
 
-        s = f"STEP {self.step}\n"
+        s = f"\033[H\nSTEP {self.step}\nTotal reward: {self.total_reward}\n"
         s += tiles[self.WALL] * (self.size + 2) + "\n"
 
         for r in range(self.size):
@@ -72,20 +84,39 @@ class GridWorld(object):
         self.grid[self.s_treasure_pos] = self.SMALL_TREASURE
 
 
-    def get_actions(self, pos):
-        np_pos = np.int8(pos)
-        UP, DOWN, LEFT, RIGHT = np_pos + [0,1], np_pos + [0,-1], np_pos + [-1, 0], np_pos + [1, 0]
-        actions = {1: UP, 2: DOWN, 3: LEFT, 4: RIGHT}
-        if UP[1] == self.size or self.grid[UP[0], UP[1]] == self.WALL:
+    def get_actions(self):
+        if self.is_terminated:
+            return []
+        np_pos = np.int8(self.agent_pos)
+        STATE_UP, STATE_DOWN, STATE_LEFT, STATE_RIGHT = np_pos + self.UP, np_pos + self.DOWN, np_pos + self.LEFT, np_pos + self.RIGHT
+        actions = {1: self.UP, 2: self.DOWN, 3: self.LEFT, 4: self.RIGHT}
+        if STATE_UP[1] == self.size or self.grid[STATE_UP[0], STATE_UP[1]] == self.WALL:
             actions.pop(1)
-        if DOWN[1] == -1 or self.grid[DOWN[0], DOWN[1]] == self.WALL:
+        if STATE_DOWN[1] == -1 or self.grid[STATE_DOWN[0], STATE_DOWN[1]] == self.WALL:
             actions.pop(2)
-        if LEFT[0] == -1 or self.grid[LEFT[0], LEFT[1]] == self.WALL:
+        if STATE_LEFT[0] == -1 or self.grid[STATE_LEFT[0], STATE_LEFT[1]] == self.WALL:
             actions.pop(3)
-        if RIGHT[0] == self.size or self.grid[RIGHT[0], RIGHT[1]] == self.WALL:
+        if STATE_RIGHT[0] == self.size or self.grid[STATE_RIGHT[0], STATE_RIGHT[1]] == self.WALL:
             actions.pop(4)
 
         return [move for _, move in actions.items()]
 
-    def do_action(self):
-        pass
+    def do_action(self, action):
+        agent_pos = np.int8(self.agent_pos)
+        self.grid[self.agent_pos] = self.EMPTY
+        agent_pos += np.int8(action)
+        self.agent_pos = tuple(agent_pos)
+        if self.grid[self.agent_pos] == self.TREASURE:
+            self.is_terminated = True
+            self.total_reward += self.treasure_rew
+            self.grid[self.agent_pos] = self.AGENT
+            return self.treasure_rew
+        if self.grid[self.agent_pos] == self.SMALL_TREASURE:
+            self.is_terminated = True
+            self.total_reward += self.s_treasure_rew
+            self.grid[self.agent_pos] = self.AGENT
+            return self.s_treasure_rew
+        self.grid[self.agent_pos] = self.AGENT
+        self.step += 1
+        self.total_reward += self.step_penalty
+        return self.step_penalty
