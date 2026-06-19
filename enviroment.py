@@ -22,8 +22,10 @@ class GridWorld(object):
             agent_start=(0,0),
 
             step_penalty = -(2**(-10)),
-            s_treasure_rew = 1,
+            small_treasure_rew = 1,
             treasure_rew = 1_000,
+            sd_treasure = 10,
+            sd_small_treasure = 1,
 
             temperature = 0.1
         ):
@@ -33,13 +35,15 @@ class GridWorld(object):
 
         self.agent_pos = agent_start
         self.treasure_pos = (size-1, size-1)
-        self.s_treasure_pos = (0, size-1)
+        self.small_treasure_pos = (0, size-1)
     
         self.step = 0
         
         self.step_penalty = step_penalty
-        self.s_treasure_rew = s_treasure_rew
+        self.small_treasure_rew = small_treasure_rew
         self.treasure_rew = treasure_rew
+        self.sd_treasure = sd_treasure
+        self.sd_small_treasure = sd_small_treasure
 
         self.temperature = temperature
 
@@ -82,7 +86,7 @@ class GridWorld(object):
 
         self.grid[self.agent_pos] = self.AGENT
         self.grid[self.treasure_pos] = self.TREASURE
-        self.grid[self.s_treasure_pos] = self.SMALL_TREASURE
+        self.grid[self.small_treasure_pos] = self.SMALL_TREASURE
 
 
     def get_actions(self):
@@ -112,16 +116,19 @@ class GridWorld(object):
             move = random.randint(0, len(a)-1)
         agent_pos += np.int8(a[move])
         self.agent_pos = tuple(agent_pos)
+
         if self.grid[self.agent_pos] == self.TREASURE:
             self.is_terminated = True
-            self.total_reward += self.treasure_rew
+            self.total_reward += self.treasure_rew + np.random.normal() * self.sd_treasure
             self.grid[self.agent_pos] = self.AGENT
             return self.treasure_rew
+        
         if self.grid[self.agent_pos] == self.SMALL_TREASURE:
             self.is_terminated = True
-            self.total_reward += self.s_treasure_rew
+            self.total_reward += self.small_treasure_rew + np.random.normal() * self.sd_small_treasure
             self.grid[self.agent_pos] = self.AGENT
-            return self.s_treasure_rew
+            return self.small_treasure_rew
+        
         self.grid[self.agent_pos] = self.AGENT
         self.step += 1
         self.total_reward += self.step_penalty
