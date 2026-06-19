@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 class GridWorld(object):
     
@@ -101,10 +102,15 @@ class GridWorld(object):
 
         return [move for _, move in actions.items()]
 
-    def do_action(self, action):
+    def do_action(self, a, move):
         agent_pos = np.int8(self.agent_pos)
         self.grid[self.agent_pos] = self.EMPTY
-        agent_pos += np.int8(action)
+        if np.random.rand() < self.temperature and len(a) != 1:
+            #Choose a random move with probability temperature
+            a.pop(move)
+            #Choose with equal probability the new move
+            move = random.randint(0, len(a)-1)
+        agent_pos += np.int8(a[move])
         self.agent_pos = tuple(agent_pos)
         if self.grid[self.agent_pos] == self.TREASURE:
             self.is_terminated = True
