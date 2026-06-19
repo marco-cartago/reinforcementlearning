@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 class GridWorld(object):
     
@@ -112,7 +113,13 @@ class GridWorld(object):
         return self.current_episode
 
 
-    def do_action(self, action):
+    def do_action(self, a, move):
+
+        if np.random.rand() < self.temperature and len(a) != 1:
+            #Choose a random move with probability temperature
+            a.pop(move)
+            #Choose with equal probability the new move
+            move = random.randint(0, len(a)-1)
 
         reward = self.step_penalty
         curr_agent_pos = self.agent_pos
@@ -120,7 +127,7 @@ class GridWorld(object):
         curr_agent_pos_np = np.int8(curr_agent_pos)
         self.grid[curr_agent_pos] = self.EMPTY
 
-        next_agent_pos_np = curr_agent_pos_np + np.int8(action)
+        next_agent_pos_np = curr_agent_pos_np + np.int8(move)
         next_agent_pos = tuple(next_agent_pos_np)
         self.agent_pos = next_agent_pos
 
