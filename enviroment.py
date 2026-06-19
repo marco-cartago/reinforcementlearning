@@ -35,7 +35,7 @@ class GridWorld(object):
 
         self.agent_pos: tuple = agent_start
         self.treasure_pos: tuple = (size-1, size-1)
-        self.s_treasure_pos: tuple = (0, size-1)
+        self.small_treasure_pos: tuple = (0, size-1)
     
         self.step = 0
         
