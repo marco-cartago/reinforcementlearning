@@ -6,7 +6,7 @@ import numpy as np
 def main():
     np.random.seed(0)
     
-    g = GridWorld(size=8)
+    g = GridWorld(size=19)
     print(g)
 
     for i in range(10):

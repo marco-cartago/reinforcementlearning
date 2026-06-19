@@ -141,7 +141,7 @@ class GridWorld(object):
             self.total_reward += self.s_treasure_rew
             reward = self.s_treasure_rew
 
-        s_a_s_r = (tuple(curr_agent_pos), tuple(action), tuple(next_agent_pos), reward)
+        s_a_s_r = (tuple(curr_agent_pos), move, tuple(next_agent_pos), reward)
         self.current_episode.append(s_a_s_r)
 
         self.grid[self.agent_pos] = self.AGENT
