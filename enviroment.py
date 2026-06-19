@@ -127,7 +127,7 @@ class GridWorld(object):
         curr_agent_pos_np = np.int8(curr_agent_pos)
         self.grid[curr_agent_pos] = self.EMPTY
 
-        next_agent_pos_np = curr_agent_pos_np + np.int8(move)
+        next_agent_pos_np = curr_agent_pos_np + np.int8(a[move])
         next_agent_pos = tuple(next_agent_pos_np)
         self.agent_pos = next_agent_pos
 
