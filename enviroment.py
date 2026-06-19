@@ -146,6 +146,9 @@ class GridWorld(object):
             reward = self.s_treasure_rew + np.random.normal() * self.sd_small_treasure
             self.total_reward += reward
 
+        sasr = (curr_agent_pos, move, next_agent_pos, reward)
+        self.current_episode.append(sasr)
+
         self.grid[self.agent_pos] = self.AGENT
         self.step += 1
         self.total_reward += self.step_penalty
