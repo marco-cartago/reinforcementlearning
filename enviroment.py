@@ -28,7 +28,8 @@ class GridWorld(object):
             sd_small_treasure = 1,
 
             temperature = 0.1,
-            gamma = 0.9
+            gamma = 0.99,
+            random_state = np.random.RandomState(0)
         ):
         self.grid = np.zeros((size, size), dtype=np.int8)
         self.size = size
@@ -37,6 +38,7 @@ class GridWorld(object):
         self.agent_pos: tuple = agent_start
         self.treasure_pos: tuple = (size-1, size-1)
         self.small_treasure_pos: tuple = (0, size-1)
+        self.agent_start = agent_start
     
         self.step = 0
         self.gamma = gamma
@@ -53,6 +55,7 @@ class GridWorld(object):
         self.total_reward = 0
 
         self.current_episode = []
+        self.random_state = random_state
 
         self.__init_gridworld()
 
@@ -85,7 +88,7 @@ class GridWorld(object):
         for r in range(self.size):
             for c in range(self.size):
                 if not (r % 2 == 0):
-                   if np.random.rand() < self.p_walls:
+                   if self.random_state.rand() < self.p_walls:
                         if (r,c) != self.agent_pos and (r,c) != self.treasure_pos:
                             self.grid[r,c] = self.WALL
 
@@ -167,7 +170,7 @@ class GridWorld(object):
         
         if self.grid[self.agent_pos] == self.SMALL_TREASURE:
             self.is_terminated = True
-            reward = self.s_treasure_rew + np.random.normal() * self.sd_small_treasure
+            reward = self.small_treasure_rew + np.random.normal() * self.sd_small_treasure
             self.total_reward += reward
 
         sasr = (curr_agent_pos, move, next_agent_pos, reward)
