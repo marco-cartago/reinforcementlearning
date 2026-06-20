@@ -10,14 +10,14 @@ def clear_screen():
 def main():
     # Initialize the environment
     gridworld = GridWorld(
-        size=10, 
+        size=13, 
         p_walls=0.2,
         agent_start=(0, 0),
-        step_penalty=-0.1,
+        step_penalty=-(2**(-10)),
         small_treasure_rew=10,
-        treasure_rew=100,
+        treasure_rew=1_000,
         temperature=0.01,
-        gamma=1.0, 
+        gamma=0.9, 
         random_state = np.random.RandomState(0)
     )
 
@@ -27,8 +27,8 @@ def main():
     # Initialize Q-learning agent
     q_agent = QLearning(gridworld, terminal_states, alpha=0.1)
 
-    n_episodes = 1000
-    max_steps_per_episode = 100
+    n_episodes = 100_000
+    max_steps_per_episode = 1000
     show_final_path = True
     episode_rewards = []
 
@@ -59,7 +59,7 @@ def main():
             s = gridworld.agent_pos
 
             # Choose action
-            if np.random.rand() < 0.5:
+            if np.random.rand() < 0.2:
                 # Explore
                 actions = gridworld.get_actions()
                 a_idx = np.random.randint(0, len(actions))
@@ -79,7 +79,7 @@ def main():
             total_reward += reward
 
             steps += 1
-            if steps % 1 == 0:
+            if steps % 10 == 0 and episode % 100 == 0:
                 print(gridworld)
                 time.sleep(0.001)
 
@@ -90,7 +90,7 @@ def main():
         episode_rewards.append(total_reward)
 
         # Print progress
-        print(f"Episode {episode + 1}/{n_episodes} | Reward: {total_reward:.2f} | Steps: {steps}\n")
+        #print(f"Episode {episode + 1}/{n_episodes} | Reward: {total_reward:.2f} | Steps: {steps}\n")
 
     #
     # After training
@@ -110,7 +110,7 @@ def main():
             treasure_rew=gridworld.treasure_rew,
             sd_treasure=gridworld.sd_treasure,
             sd_small_treasure=gridworld.sd_small_treasure,
-            temperature=0.1,  # No exploration for final demo
+            temperature=gridworld.temperature,
             gamma=gridworld.gamma
         )
         gridworld.current_episode = []
@@ -133,7 +133,7 @@ def main():
             steps += 1
             clear_screen()
             print(gridworld)
-            time.sleep(0.3)  # Slow down for visualization
+            time.sleep(0.1)  # Slow down for visualization
 
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
