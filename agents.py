@@ -1,5 +1,5 @@
 import numpy as np
-from enviroment import GridWorld
+from enviroment import GridWorld, a2idx
 
 class QLearning(object):
 
@@ -26,8 +26,8 @@ class QLearning(object):
         # Terminal states have Q-value 0 for all actions
         for a in [self.gridworld.UP, self.gridworld.DOWN,
                   self.gridworld.LEFT, self.gridworld.RIGHT]:
-            table[(self.gridworld.treasure_pos, tuple(a))] = 0
-            table[(self.gridworld.small_treasure_pos, tuple(a))] = 0
+            table[(a2idx(self.gridworld.treasure_pos), a2idx(a))] = 0
+            table[(a2idx(self.gridworld.small_treasure_pos), a2idx(a))] = 0
 
         self.table = table
 
@@ -35,22 +35,15 @@ class QLearning(object):
         """Update Q-table using the current episode from the gridworld"""
         episode = self.gridworld.get_episode()
         for t in range(len(episode)):
-            s, a_idx, s_next, r = episode[t]
-            a = self.gridworld.get_actions()[a_idx]  # Get the action vector
-
-            if (s, tuple(a)) in self.table:
-                if s_next in self.terminal_states:
-                    best_next_value = 0
-                else:
-                    best_next_value = self.best_value(s_next)
-
-                # Update Q-value
-                self.table[(s, tuple(a))] = (1 - self.alpha) * self.Q(s, tuple(a)) + \
+            s, a, s_next, r = episode[t]
+            best_next_value = self.best_value(s_next)
+            self.table[(s, a)] = (1 - self.alpha) * self.Q(s, tuple(a)) + \
                                           self.alpha * (r + self.gamma * best_next_value)
+            
 
     def Q(self, s, a) -> float:
-        a_tuple = tuple(a) if not isinstance(a, tuple) else a
-        return self.table.get((s, a_tuple), 0.0)
+        s = (int(s[0]), int(s[1]))
+        return self.table.get((s, a), 0.0)
 
     def best_value(self, s) -> float:
         maximum = float("-inf")
