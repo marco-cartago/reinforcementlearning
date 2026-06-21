@@ -150,7 +150,8 @@ class GridWorld(object):
             c_pos + self.DOWN, 
             c_pos + self.LEFT, 
             c_pos + self.RIGHT
-        )
+        ) 
+
         actions = []
        
         if s_up[1] != self.size and self.grid[s_up[0], s_up[1]] != self.WALL:
