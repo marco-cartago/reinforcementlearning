@@ -103,6 +103,13 @@ class GridWorld(object):
         self.grid[a2idx(self.treasure_pos)] = self.TREASURE
         self.grid[a2idx(self.small_treasure_pos)] = self.SMALL_TREASURE
 
+    def reset(self):
+        """Reset the gridworld to the initial state"""
+        self.agent_pos = self.agent_start.copy()
+        self.step = 0
+        self.is_terminated = False
+        self.total_reward = 0
+        self.current_episode = []
 
     def get_actions(self):
         """Given the current agent positon return the legal actions"""
