@@ -138,9 +138,6 @@ class GridWorld(object):
     def get_legal_actions(self, c_pos: np.ndarray):
         """Given the current agent positon return the legal actions"""
 
-        if self.is_terminated:
-            return []
-
         s_up, s_down, s_left, s_right = (
             c_pos + self.UP, 
             c_pos + self.DOWN, 
@@ -185,7 +182,7 @@ class GridWorld(object):
         end_agent_pos = self.agent_pos + move
 
         # Move the agent to the new position
-        self.grid[start_agent_pos] = self.EMPTY
+        self.grid[a2idx(start_agent_pos)] = self.EMPTY
 
         self.agent_pos = end_agent_pos
 
@@ -203,7 +200,7 @@ class GridWorld(object):
         sasr = (start_agent_pos, move, end_agent_pos, reward)
         self.current_episode.append(sasr)
 
-        self.grid[self.agent_pos] = self.AGENT
+        self.grid[a2idx(self.agent_pos)] = self.AGENT
         self.step += 1
         self.total_reward += self.step_penalty * self.gamma**self.step
 
