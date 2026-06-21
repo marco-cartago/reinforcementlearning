@@ -69,9 +69,9 @@ class GridWorld(object):
         tiles = {
             self.EMPTY: " ⋅ ",
             self.WALL: "███",
-            self.AGENT: "🤖 ",
-            self.TREASURE: "💰 ",
-            self.SMALL_TREASURE: "🪙 ",
+            self.AGENT: "[o]",
+            self.TREASURE: "$$$",
+            self.SMALL_TREASURE: " $ ",
         }
 
         s = f"\033[H\nSTEP {self.step}\nTotal reward: {self.total_reward}\n"
