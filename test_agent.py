@@ -11,14 +11,14 @@ def clear_screen():
 def main():
     # Initialize the environment
     gridworld = GridWorld(
-        size=8, 
-        p_walls=0.60,
+        size=10,
+        p_walls=0.6,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
-        small_treasure_rew=-1000,
+        small_treasure_rew=10,
         treasure_rew=1_000,
         temperature=0.01,
-        gamma=0.99, 
+        gamma=0.999, 
         random_state = np.random.RandomState(0)
     )
 
@@ -26,9 +26,9 @@ def main():
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
 
     # Initialize Q-learning agent
-    q_agent = QLearning(gridworld, terminal_states, alpha=1e-3)
+    q_agent = QLearning(gridworld, terminal_states, alpha=1)
 
-    n_episodes = 100
+    n_episodes = 1_000
     max_steps_per_episode = 500
     show_final_path = True
     episode_rewards = []
@@ -48,13 +48,14 @@ def main():
             gamma=gridworld.gamma,
             random_state=np.random.RandomState(0)
         )
-        q_agent.gridworld = gridworld
         gridworld.current_episode = []  # Clear previous episode
         gridworld.is_terminated = False
         gridworld.total_reward = 0
         gridworld.step = 0
         total_reward = 0
         steps = 0
+        q_agent.gridworld = gridworld
+        q_agent.alpha = (1 - episode / n_episodes)  # Decaying learning rate
 
         # Run episode
         while not gridworld.is_terminated and steps < max_steps_per_episode:
@@ -75,9 +76,9 @@ def main():
             total_reward += reward
 
             steps += 1
-            # if episode % 1 == 0:
-            #     print(gridworld)
-            #     time.sleep(0.01)
+            if episode % 1000 == 0:
+                print(gridworld)
+                time.sleep(0.05)
 
         # Learn
         q_agent.learn_from_episode()
@@ -122,7 +123,7 @@ def main():
             steps += 1
             clear_screen()
             print(gridworld)
-            time.sleep(1)  # Slow down for visualization
+            time.sleep(0.1)  # Slow down for visualization
 
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
@@ -136,7 +137,7 @@ def main():
     plt.ylabel("Total Reward")
     plt.grid(True)
     plt.show()
-    print(q_agent.table)
-
+    
 if __name__ == "__main__":
+    clear_screen()
     main()
