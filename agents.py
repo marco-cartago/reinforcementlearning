@@ -21,7 +21,7 @@ class QLearning(object):
             for j in range(self.gridworld_size):
                 if self.gridworld.grid[(i,j)] != self.gridworld.WALL:
                     for a in self.gridworld.get_legal_actions((i,j)):
-                        table[((i,j), tuple(a))] = 0
+                        table[((i,j), a2idx(a))] = 0
 
         # Terminal states have Q-value 0 for all actions
         for a in [self.gridworld.UP, self.gridworld.DOWN,
@@ -37,26 +37,32 @@ class QLearning(object):
         for t in range(len(episode)):
             s, a, s_next, r = episode[t]
             best_next_value = self.best_value(s_next)
-            self.table[(s, a)] = (1 - self.alpha) * self.Q(s, tuple(a)) + \
-                                          self.alpha * (r + self.gamma * best_next_value)
+            qs = (a2idx(s), a2idx(a))
+            qv = self.Q(s, a)
+            self.table[qs] = (
+                (1 - self.alpha) * qv + self.alpha * (r + self.gamma * best_next_value)
+            )
             
 
-    def Q(self, s, a) -> float:
-        s = (int(s[0]), int(s[1]))
-        return self.table.get((s, a), 0.0)
+    def Q(self, s: np.ndarray, a: np.ndarray) -> float:
+        return self.table.get((a2idx(s), a2idx(a)), 0.0)
 
     def best_value(self, s) -> float:
-        maximum = float("-inf")
-        for a in self.gridworld.get_legal_actions(s):
-            maximum = max(self.Q(s, tuple(a)), maximum)
+        """Return the best Q-value for a given state"""
+        legal_actions = self.gridworld.get_legal_actions(s)
+        maximum = self.Q(s, legal_actions[0])
+        for a in legal_actions[1:]:
+            maximum = max(self.Q(s, a), maximum)
         return maximum
 
     def best_action(self, s):
         """Return the best action for a given state"""
-        best_val = float("-inf")
-        best_act = None
-        for a in self.gridworld.get_legal_actions(s):
-            val = self.Q(s, tuple(a))
+        legal_actions = self.gridworld.get_legal_actions(s)
+        a = legal_actions[0]
+        best_val = self.Q(s, a)
+        best_act = a
+        for a in legal_actions[1:]:
+            val = self.Q(s, a)
             if val > best_val:
                 best_val = val
                 best_act = a
