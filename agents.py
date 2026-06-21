@@ -20,7 +20,7 @@ class QLearning(object):
         for i in range(self.gridworld_size):
             for j in range(self.gridworld_size):
                 if self.gridworld.grid[(i,j)] != self.gridworld.WALL:
-                    for a in self.gridworld.get_legal_actions((i,j)):
+                    for a in self.gridworld.get_legal_actions(np.array([i,j])):
                         table[((i,j), a2idx(a))] = 0
 
         # Terminal states have Q-value 0 for all actions
@@ -67,3 +67,13 @@ class QLearning(object):
                 best_val = val
                 best_act = a
         return best_act
+    
+    def best_action_epsilon_greedy(self, s, epsilon: float=0.1):
+        if np.random.rand() < epsilon:
+            actions = self.gridworld.get_legal_actions(s)
+            a_idx = np.random.randint(0, len(actions))
+            a = actions[a_idx]
+        else:
+            a = self.best_action(s)
+        
+        return a
