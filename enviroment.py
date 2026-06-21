@@ -32,7 +32,7 @@ class GridWorld(object):
             sd_small_treasure = 1,
 
             temperature = 0.1,
-            gamma = 0.99,
+            gamma = 0.9,
             random_state = np.random.RandomState(0)
         ):
         self.grid = np.zeros((size, size), dtype=np.int8)
