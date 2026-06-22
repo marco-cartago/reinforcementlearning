@@ -5,6 +5,7 @@ from enviroment import GridWorld
 from agents import QLearning, VAPOR
 from tqdm import tqdm
 
+
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -133,7 +134,7 @@ def main_QLEARNING():
 def main_VAPOR():
         # Initialize the environment
     gridworld = GridWorld(
-        size=10,
+        size=30,
         p_walls=0.6,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
@@ -151,7 +152,7 @@ def main_VAPOR():
     VAPOR_agent = VAPOR(gridworld, terminal_states, alpha=1)
 
     n_episodes = 1_000
-    max_steps_per_episode = 100 + 12
+    max_steps_per_episode = 1_000 + 12
     show_final_path = True
     episode_rewards = []
 
@@ -188,7 +189,7 @@ def main_VAPOR():
             total_reward += reward
 
             steps += 1
-            if episode % 1_000 == 0:
+            if episode % 100 == 0:
                 print(gridworld)
                 time.sleep(0.01)
 

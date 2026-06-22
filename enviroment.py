@@ -102,6 +102,7 @@ class GridWorld(object):
         self.grid[a2idx(self.agent_pos)] = self.AGENT
         self.grid[a2idx(self.treasure_pos)] = self.TREASURE
         self.grid[a2idx(self.small_treasure_pos)] = self.SMALL_TREASURE
+        
 
     def reset(self):
         """Reset the gridworld to the initial state"""
@@ -140,6 +141,24 @@ class GridWorld(object):
             actions.append(self.RIGHT)
 
         return actions
+
+    def get_transition_prob(self, s: np.ndarray, a: np.ndarray, sn: np.ndarray) -> float:
+
+        if self.grid[a2idx(sn)] == self.WALL or self.grid[a2idx(s)] == self.WALL:
+            return 0.0
+
+        if np.array_equal(s + a, sn):
+            return 1.0 - self.temperature
+        
+        len_legal_actions = len(self.get_legal_actions(s))
+
+        if len_legal_actions == 1:
+            return 1.0
+
+        if np.linalg.norm(s - sn, ord=1) <= 1:
+            return self.temperature / (len_legal_actions - 1)
+
+        return 0.0
 
 
     def get_legal_actions(self, c_pos: np.ndarray):

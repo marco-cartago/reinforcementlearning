@@ -81,6 +81,7 @@ class QLearning(object):
         
         return a
 
+
 class VAPOR(object):
     def __init__(self, gridworld: GridWorld, terminal_states, alpha=0.01, nu = 50):
         self.gridworld = gridworld
@@ -94,13 +95,14 @@ class VAPOR(object):
         self.table_lambda = {}
         self.table_rewards = {}
         self.table_episodes = {}
+        self.legal_states = []
         self.__init_table()
 
         self.np_reward = np.array(list(self.table_rewards.values()))
         self.np_episodes = np.array(list(self.table_episodes.values()))
 
-        self.keys = list(self.table_lambda.keys())
-        self.q2idx = {self.keys[i]: i for i in range(len(self.keys))}
+        self.lambda_keys = list(self.table_lambda.keys())
+        self.q2idx = {self.lambda_keys[i]: i for i in range(len(self.lambda_keys))}
 
         self.nu = nu
 
@@ -110,6 +112,7 @@ class VAPOR(object):
         for i in range(self.gridworld_size):
             for j in range(self.gridworld_size):
                 if self.gridworld.grid[(i,j)] != self.gridworld.WALL:
+                    self.legal_states.append((i,j))
                     for a in self.gridworld.get_legal_actions(np.array([i,j])):
                         table[((i,j), a2idx(a))] = 0
                         table_ones[((i,j), a2idx(a))] = 1e-10
@@ -161,6 +164,25 @@ class VAPOR(object):
             idx = self.q2idx[(state, a2idx(a))]
             constraint += lam[idx] 
 
+        constraint -= 1
+
+        for sp in self.legal_states:
+            
+            lhs = 0
+            for a in self.gridworld.get_legal_actions(sp):
+                idx = self.q2idx[(sp, a2idx(a))]
+                lhs += lam[idx]
+            
+            rhs = 0
+            for s in self.legal_states:
+                for a in self.gridworld.get_legal_actions(s):
+                    idx = self.q2idx[(s, a2idx(a))]
+                    rhs += self.gridworld.get_transition_prob(s, a, sp) * lam[idx]
+
+            constraint += lhs - rhs
+
+        return constraint 
+
     def find_lambdas(self):
         np_lambdas = np.array(list(self.table_lambda.values()))
         self.np_reward = np.array(list(self.table_rewards.values()))
@@ -174,7 +196,7 @@ class VAPOR(object):
 
         )
         
-        self.table_lambda = dict(zip(self.keys, result.x))
+        self.table_lambda = dict(zip(self.lambda_keys, result.x))
 
     def VAPOR_function(self, lambdas):
         
