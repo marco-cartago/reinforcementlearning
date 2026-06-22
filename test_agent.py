@@ -8,10 +8,10 @@ from tqdm import tqdm
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def main():
+def main_QLEARNING():
     # Initialize the environment
     gridworld = GridWorld(
-        size=19,
+        size=6,
         p_walls=0.6,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
@@ -28,8 +28,8 @@ def main():
     # Initialize Q-learning agent
     q_agent = QLearning(gridworld, terminal_states, alpha=1)
 
-    n_episodes = 100_000
-    max_steps_per_episode = 10_000
+    n_episodes = 20_000
+    max_steps_per_episode = 1_000
     show_final_path = True
     episode_rewards = []
 
@@ -133,7 +133,7 @@ def main():
 def main_VAPOR():
         # Initialize the environment
     gridworld = GridWorld(
-        size=19,
+        size=10,
         p_walls=0.6,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
@@ -151,7 +151,7 @@ def main_VAPOR():
     VAPOR_agent = VAPOR(gridworld, terminal_states, alpha=1)
 
     n_episodes = 1_000
-    max_steps_per_episode = 10_000
+    max_steps_per_episode = 100 + 12
     show_final_path = True
     episode_rewards = []
 
@@ -188,11 +188,9 @@ def main_VAPOR():
             total_reward += reward
 
             steps += 1
-            '''
-            if episode % 10_000 == 0:
+            if episode % 1_000 == 0:
                 print(gridworld)
                 time.sleep(0.01)
-                '''
 
         # Learn
         VAPOR_agent.learn_from_episode()
@@ -237,7 +235,7 @@ def main_VAPOR():
             steps += 1
             clear_screen()
             print(gridworld)
-            time.sleep(0.1)  # Slow down for visualization
+            time.sleep(0.05)  # Slow down for visualization
 
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
@@ -254,5 +252,5 @@ def main_VAPOR():
     
 if __name__ == "__main__":
     clear_screen()
-    #main()
+    # main_QLEARNING()
     main_VAPOR()
