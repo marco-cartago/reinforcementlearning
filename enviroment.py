@@ -154,16 +154,16 @@ class GridWorld(object):
 
         actions = []
        
-        if s_up[1] != self.size and self.grid[s_up[0], s_up[1]] != self.WALL:
+        if s_up[1] != self.size and self.grid[a2idx(s_up)] != self.WALL:
             actions.append(self.UP)
        
-        if s_down[1] != -1 and self.grid[s_down[0], s_down[1]] != self.WALL:
+        if s_down[1] != -1 and self.grid[a2idx(s_down)] != self.WALL:
             actions.append(self.DOWN)
        
-        if s_left[0] != -1 and self.grid[s_left[0], s_left[1]] != self.WALL:
+        if s_left[0] != -1 and self.grid[a2idx(s_left)] != self.WALL:
             actions.append(self.LEFT)
        
-        if s_right[0] != self.size and self.grid[s_right[0], s_right[1]] != self.WALL:
+        if s_right[0] != self.size and self.grid[a2idx(s_right)] != self.WALL:
             actions.append(self.RIGHT)
 
         return actions
