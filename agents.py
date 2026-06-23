@@ -84,7 +84,7 @@ class QLearning(object):
 
 
 class VAPOR(object):
-    def __init__(self, gridworld: GridWorld, terminal_states, sigma_prior=1.0, sigma_noise=1.0):
+    def __init__(self, gridworld: GridWorld, terminal_states, sigma_prior=100.0, sigma_noise=10.0):
         self.sigma_prior = sigma_prior
         self.sigma_noise = sigma_noise
 

@@ -2,7 +2,7 @@ import numpy as np
 import time
 import os
 from enviroment import GridWorld
-from agents import QLearning, VAPOR, VAPOR2
+from agents import QLearning, VAPOR, VAPOR_variant
 from tqdm import tqdm
 
 
