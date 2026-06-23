@@ -2,7 +2,7 @@ import numpy as np
 import time
 import os
 from enviroment import GridWorld
-from agents import QLearning, VAPOR
+from agents import QLearning, VAPOR, VAPOR2
 from tqdm import tqdm
 
 
@@ -134,8 +134,8 @@ def main_QLEARNING():
 def main_VAPOR():
         # Initialize the environment
     gridworld = GridWorld(
-        size=30,
-        p_walls=0.6,
+        size=5,
+        p_walls=0.65,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
         small_treasure_rew=10,
@@ -149,10 +149,10 @@ def main_VAPOR():
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
 
     # Initialize Q-learning agent
-    VAPOR_agent = VAPOR(gridworld, terminal_states, alpha=1)
+    VAPOR_agent = VAPOR(gridworld, terminal_states)#, alpha=1)
 
     n_episodes = 1_000
-    max_steps_per_episode = 1_000 + 12
+    max_steps_per_episode = 50
     show_final_path = True
     episode_rewards = []
 
@@ -176,8 +176,6 @@ def main_VAPOR():
         total_reward = 0
 
         VAPOR_agent.gridworld = gridworld
-
-        VAPOR_agent.alpha = 0.1 * (1 - episode / n_episodes)  # Decaying learning rate
 
         # Run episode
         while not gridworld.is_terminated and steps < max_steps_per_episode:
@@ -204,6 +202,7 @@ def main_VAPOR():
     #
     # After training
     # 
+
 
     if show_final_path:
         clear_screen()
@@ -241,6 +240,8 @@ def main_VAPOR():
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
 
+    for l in VAPOR_agent.table_lambda.keys():
+        print(l, VAPOR_agent.table_lambda[l])
     # Plot rewards
     import matplotlib.pyplot as plt
     plt.figure(figsize=(10, 5))
