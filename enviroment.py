@@ -143,20 +143,25 @@ class GridWorld(object):
         return actions
 
     def get_transition_prob(self, s: np.ndarray, a: np.ndarray, sn: np.ndarray) -> float:
-
         if self.grid[a2idx(sn)] == self.WALL or self.grid[a2idx(s)] == self.WALL:
             return 0.0
 
+        legal_actions = self.get_legal_actions(s)
+        len_legal_actions = len(legal_actions)
+
+        # Mossa intenzionale
         if np.array_equal(s + a, sn):
+            if len_legal_actions == 1:
+                return 1.0
             return 1.0 - self.temperature
-        
-        len_legal_actions = len(self.get_legal_actions(s))
 
-        if len_legal_actions == 1:
-            return 1.0
+        # Mossa casuale: sn deve essere raggiungibile con un'azione legale diversa da a
+        if len_legal_actions <= 1:
+            return 0.0
 
-        if np.linalg.norm(s - sn, ord=1) <= 1:
-            return self.temperature / (len_legal_actions - 1)
+        for a2 in legal_actions:
+            if not np.array_equal(a2, a) and np.array_equal(s + a2, sn):
+                return self.temperature / (len_legal_actions - 1)
 
         return 0.0
 

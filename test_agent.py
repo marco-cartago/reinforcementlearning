@@ -134,7 +134,7 @@ def main_QLEARNING():
 def main_VAPOR():
         # Initialize the environment
     gridworld = GridWorld(
-        size=5,
+        size=4,
         p_walls=0.65,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
@@ -152,7 +152,7 @@ def main_VAPOR():
     VAPOR_agent = VAPOR(gridworld, terminal_states)#, alpha=1)
 
     n_episodes = 1_000
-    max_steps_per_episode = 50
+    max_steps_per_episode = 100
     show_final_path = True
     episode_rewards = []
 
@@ -188,7 +188,7 @@ def main_VAPOR():
 
             steps += 1
             if episode % 100 == 0:
-                print(gridworld)
+                #print(gridworld)
                 time.sleep(0.01)
 
         # Learn
