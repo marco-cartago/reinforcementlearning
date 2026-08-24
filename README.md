@@ -13,7 +13,27 @@ With enough time it would be interesting to apply this same set of methods and a
 
 ## A closer look at the enviroment
 
+```text
+███████████████████████████████████████████████████
+███ ⋅ [o] ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  $ ███
+███████████████ ⋅ ███ ⋅  ⋅ ███ ⋅ ███ ⋅ ███ ⋅  ⋅ ███
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ ███
+███ ⋅ ███ ⋅  ⋅ ███ ⋅ ██████ ⋅ ███ ⋅ ███████████████
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ ███
+█████████ ⋅  ⋅ ███ ⋅ ██████ ⋅  ⋅  ⋅ ███ ⋅  ⋅  ⋅ ███
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ ███
+██████ ⋅ ███ ⋅ ███ ⋅  ⋅ █████████ ⋅ ███ ⋅  ⋅  ⋅ ███
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ ███
+███ ⋅ ██████ ⋅ ███████████████ ⋅ ██████ ⋅  ⋅ ██████
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ ███
+██████ ⋅ ██████ ⋅  ⋅ ██████ ⋅ ████████████ ⋅  ⋅ ███
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ ███
+█████████████████████ ⋅ ████████████ ⋅ ██████ ⋅ ███
+███ ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅  ⋅ $$$███
+███████████████████████████████████████████████████
+```
 
+In our setup the agent (`[o]`) navigates a bidimensional maze. In the lower right corner is placed a big reward `$$$` while in the uppper part of the labyrinth, in a spot that is always much easier to reach, is placed a smaller less valuable treasure ` $ `. This type of enviroment specifically evaluates the capability of a learning algorithm to perform deep exploration. A simpler version of this setup is used by the authors of VAPOR.
 
 ## Running the code
 

@@ -14,12 +14,14 @@ def clear_screen():
 def main_QLEARNING():
     # Initialize the environment
     config = GridWorldConfig(
-        size=6,
+        size=15,
         p_walls=0.6,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
         small_treasure_rew=10,
         treasure_rew=1_000,
+        sd_small_treasure=1.0,
+        sd_treasure=10.0,
         temperature=0.01,
         gamma=0.99, 
         random_state = np.random.RandomState(0)
@@ -64,7 +66,6 @@ def main_QLEARNING():
         episode_rewards.append(total_reward)
         # Print progress
         #print(f"Episode {episode + 1}/{n_episodes} | Reward: {total_reward:.2f} | Steps: {steps}\n")
-
     #
     # After training
     # 
@@ -105,12 +106,14 @@ def main_QLEARNING():
 def main_VAPOR():
         # Initialize the environment
     config = GridWorldConfig(
-        size=4,
-        p_walls=0.65,
+        size=15,
+        p_walls=0.6,
         agent_start=np.array((0, 0)),
         step_penalty=-(2**(-10)),
         small_treasure_rew=10,
         treasure_rew=1_000,
+        sd_small_treasure=1.0,
+        sd_treasure=10.0,
         temperature=0.01,
         gamma=0.99, 
         random_state = np.random.RandomState(0)
@@ -196,5 +199,5 @@ def main_VAPOR():
     
 if __name__ == "__main__":
     clear_screen()
-    # main_QLEARNING()
-    main_VAPOR()
+    main_QLEARNING()
+    # main_VAPOR()
