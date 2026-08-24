@@ -1,9 +1,42 @@
 import numpy as np
 import random
+from copy import deepcopy
 
 def a2idx(a: np.ndarray) -> tuple:
     """Convert a numpy array to a tuple"""
     return (int(a[0]), int(a[1]))
+
+class GridWorldConfig(object): 
+
+    def __init__(
+        self, 
+        size, 
+        p_walls, 
+        agent_start, 
+        step_penalty, 
+        small_treasure_rew, 
+        treasure_rew, 
+        sd_treasure, 
+        sd_small_treasure, 
+        temperature=1.0, 
+        gamma=0.99, 
+        random_state=np.random.RandomState(0)
+    ):
+        self.size = size 
+        self.p_walls = p_walls
+        self.agent_start = agent_start
+        self.step_penalty = step_penalty
+        self.small_treasure_rew = small_treasure_rew
+        self.treasure_rew = treasure_rew
+        self.sd_treasure = sd_treasure
+        self.sd_small_treasure = sd_small_treasure
+        self.temperature = temperature
+        self.gamma = gamma
+        self.random_state = deepcopy(random_state)
+
+    def __repr__(self):
+        params = "\n  ".join([f"{k}={v}" for k, v in self.__dict__.items()])
+        return f"GridWorldConfig(\n  {params}\n)"
 
 class GridWorld(object):
     
@@ -19,22 +52,21 @@ class GridWorld(object):
     RIGHT = np.array([1, 0])
 
 
-    def __init__(
-            self, 
-            size=20, 
-            p_walls=0.5, 
-            agent_start=np.array([0,0]),
+    def __init__(self, config: GridWorldConfig):
+        size = config.size
+        p_walls = config.p_walls
+        agent_start = config.agent_start
 
-            step_penalty = -(2**(-10)),
-            small_treasure_rew = 1,
-            treasure_rew = 1_000,
-            sd_treasure = 10,
-            sd_small_treasure = 1,
+        step_penalty = config.step_penalty
+        small_treasure_rew = config.small_treasure_rew
+        treasure_rew = config.treasure_rew
+        sd_treasure = config.sd_treasure
+        sd_small_treasure = config.sd_small_treasure
 
-            temperature = 0.1,
-            gamma = 0.9,
-            random_state = np.random.RandomState(0)
-        ):
+        temperature = config.temperature
+        gamma = config.gamma
+        random_state = config.random_state
+
         self.grid = np.zeros((size, size), dtype=np.int8)
         self.size = size
         self.p_walls = p_walls
