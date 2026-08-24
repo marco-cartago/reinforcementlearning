@@ -10,17 +10,17 @@ class GridWorldConfig(object):
 
     def __init__(
         self, 
-        size, 
-        p_walls, 
-        agent_start, 
-        step_penalty, 
-        small_treasure_rew, 
-        treasure_rew, 
-        sd_treasure, 
-        sd_small_treasure, 
-        temperature=1.0, 
-        gamma=0.99, 
-        random_state=np.random.RandomState(0)
+        size: int, 
+        p_walls: float, 
+        agent_start: np.array, 
+        step_penalty: float, 
+        small_treasure_rew: float, 
+        treasure_rew: float, 
+        sd_treasure: float, 
+        sd_small_treasure: float, 
+        temperature: float = 0.1, 
+        gamma: float = 0.99, 
+        random_state: np.random.RandomState = np.random.RandomState(0)
     ):
         self.size = size 
         self.p_walls = p_walls
@@ -50,7 +50,6 @@ class GridWorld(object):
     DOWN = np.array([0, -1])
     LEFT = np.array([-1, 0])
     RIGHT = np.array([1, 0])
-
 
     def __init__(self, config: GridWorldConfig):
         size = config.size
