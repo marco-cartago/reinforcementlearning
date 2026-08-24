@@ -1,3 +1,4 @@
 numpy==2.4.6
 pyffish==0.0.89
 scipy==1.18.1
+tqdm==4.70.0
