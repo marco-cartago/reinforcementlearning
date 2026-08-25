@@ -68,12 +68,9 @@ def main_QLEARNING():
 
         # Store episode reward
         episode_rewards.append(total_reward)
-        # Print progress
-        # print(f"Episode {episode + 1}/{n_episodes} | Reward: {total_reward:.2f} | Steps: {steps}\n")
-    #
-    # After training
-    #
 
+
+    # After training
     if show_final_path:
         clear_screen()
         print("\n=== Final Learned Path ===")
@@ -134,25 +131,18 @@ def main_VAPOR():
         while not gridworld.is_terminated and steps < max_steps_per_episode:
             s = gridworld.agent_pos
             a = VAPOR_agent.best_action_lambda(s)
-            # Take action
-            reward = gridworld.do_action(a)
+            reward = gridworld.do_action(a)             # Take action
             total_reward += reward
             steps += 1
             if episode % 100 == 0:
                 # print(gridworld)
                 time.sleep(0.01)
 
-        # Learn
+        # Learn and store episode reward
         VAPOR_agent.learn_from_episode()
-        # Store episode reward
         episode_rewards.append(total_reward)
-        # Print progress
-        # print(f"Episode {episode + 1}/{n_episodes} | Reward: {total_reward:.2f} | Steps: {steps}\n")
 
-    #
     # After training
-    #
-
     if show_final_path:
         clear_screen()
         print("\n=== Final Learned Path ===")
@@ -177,8 +167,8 @@ def main_VAPOR():
 
     for l in VAPOR_agent.table_lambda.keys():
         print(l, VAPOR_agent.table_lambda[l])
-    # Plot rewards
 
+    # Plot rewards
     plt.figure(figsize=(10, 5))
     plt.plot(episode_rewards)
     plt.title("Reward per Episode")
