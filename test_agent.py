@@ -5,7 +5,7 @@ import subprocess
 import matplotlib.pyplot as plt
 
 from enviroment import GridWorld, GridWorldConfig
-from agents import QLearning, VAPOR, VAPOR_variant
+from agents import QLearning, VAPOR
 from tqdm import tqdm
 
 CONFIG: GridWorldConfig = GridWorldConfig(
@@ -19,7 +19,7 @@ CONFIG: GridWorldConfig = GridWorldConfig(
     sd_treasure=10.0,
     temperature=0.01,
     gamma=0.99,
-    random_state=np.random.RandomState(0),
+    random_state=0
 )
 
 
