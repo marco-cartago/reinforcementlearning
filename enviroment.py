@@ -12,7 +12,7 @@ class GridWorldConfig(object):
         self, 
         size: int, 
         p_walls: float, 
-        agent_start: np.array, 
+        agent_start: np.ndarray, 
         step_penalty: float, 
         small_treasure_rew: float, 
         treasure_rew: float, 
@@ -20,7 +20,7 @@ class GridWorldConfig(object):
         sd_small_treasure: float, 
         temperature: float = 0.1, 
         gamma: float = 0.99, 
-        random_state: np.random.RandomState = np.random.RandomState(0)
+        random_state: int = 0
     ):
         self.size = size 
         self.p_walls = p_walls
@@ -32,7 +32,7 @@ class GridWorldConfig(object):
         self.sd_small_treasure = sd_small_treasure
         self.temperature = temperature
         self.gamma = gamma
-        self.random_state = deepcopy(random_state)
+        self.random_state = random_state
 
     def __repr__(self):
         params = "\n  ".join([f"{k}={v}" for k, v in self.__dict__.items()])
@@ -64,7 +64,7 @@ class GridWorld(object):
 
         temperature = config.temperature
         gamma = config.gamma
-        random_state = config.random_state
+        random_state = np.random.RandomState(config.random_state)
 
         self.grid = np.zeros((size, size), dtype=np.int8)
         self.size = size
