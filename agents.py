@@ -4,7 +4,7 @@ from scipy.optimize import minimize
 import math
 from copy import deepcopy
 from time import sleep
-import cvxpy as cv
+import cvxpy as cp
 
 
 class QLearning(object):
@@ -91,7 +91,11 @@ class QLearning(object):
 class VAPOR(object):
 
     def __init__(
-        self, gridworld: GridWorld, terminal_states, horizon: int, sigma_prior: float = 100.0, sigma_noise: float = 10.0,
+        self,
+        gridworld: GridWorld,
+        terminal_states,
+        horizon: int,
+        sigma_prior: float = 1.0,
     ):
         # Gridworld structure
         self.gridworld = gridworld
@@ -102,49 +106,70 @@ class VAPOR(object):
         self.horizon = horizon
 
         # Prior paremeters
-        self.sigma_noise = sigma_noise
         self.sigma_prior = sigma_prior
 
         # Definition of lambda, r, sigma
-        self.qtable_lambda = {}
-        self.qtable_r = {}
-        self.qtable_sigma = {}
+        self.curr_lambda: np.ndarray = np.array(
+            0,
+        )  # Current lambda estimate
+        self.curr_rewards: np.ndarray = np.array(
+            0,
+        )  # Current expected rewards
+        self.curr_variance: np.ndarray = np.array(
+            0,
+        )  # Current expected variance
 
-        self.qstate_to_idx = {}
-
-        self.legal_qstates = []  # Each element is of the form (l, (i,j), a) (timestep, position, action)
+        self.qstate_to_idx = (
+            {}
+        )  # Mapping from qstate (l, (i,j), a) to position inside the array
+        self.legal_qstates = (
+            []
+        )  # Each element is of the form (l, (i,j), a) (timestep, position, action)
         self.legal_states = []
-        self.n_actions = []
 
-        self.init_table()        # Initializes the tables
+        self._init_table()  # Initializes the tables and the arrays
 
-    def init_table(self):
+
+    def _init_table(self):
+        """
+        Initializes:
+            - List of available legal position in the enviroment
+            - List of all available q-states for a maximum of L steps
+
+        """
         gw = self.gridworld
 
         for l in range(self.horizon):
             for i in range(self.gridworld_size):
                 for j in range(self.gridworld_size):
-
                     if gw.grid[(i, j)] != gw.WALL:
                         legal_actions = gw.get_legal_actions(np.array([i, j]))
-                        self.legal_states.append((i,j))
-
+                        self.legal_states.append((i, j))
                         for a in legal_actions:
                             sa = (l, (i, j), a2idx(a))
                             self.legal_qstates.append(sa)
 
         # Establish a mapping between state and vector position
-        self.qstate_to_idx = {key: idx for key, idx in enumerate(self.qtable_lambda.keys())}
+        self.qstate_to_idx = {key: idx for idx, key in enumerate(self.legal_qstates)}
 
-        # Normalize the lambda vector so that
+        # Setting up parameters of the model's model of the enviroment
+        self.curr_rewards = np.zeros(len(self.legal_qstates))
+        self.curr_variance = np.zeros_like(self.curr_rewards) + self.sigma_prior
 
-    def lambda_stat_constraint(self, x: cv.Variable):
+
+    def update_model_prior(self, rwp: np.ndarray, sgp: np.ndarray):
+        rw = self.curr_rewards
+        sg = self.curr_variance
+        self.curr_variance = (sg * sgp) / (sg + sgp)
+        self.curr_rewards = self.curr_variance * (rw / sg + rwp / sgp)
+
+
+    def lambda_stat_constraint(self, x: cp.Variable):
         """
         Imposess the stationarity constraint on the varaible passed as input.
         Assumes that the structure of `x` is the same as the one of
          - `self.qtable_lambda`
          - `self.qtable_r`
-
         In terms of sequential order of the unrolled states in list form.
         """
         constraints = []
@@ -157,13 +182,15 @@ class VAPOR(object):
         # \ro(s) = \sum _a \lambda_1(s,a)
         # As the agent deterministically starts always in the same position.
         for s in self.legal_states:
-            idxs = [indexof((0, s, a2idx(a))) for a in self.gridworld.get_legal_actions(np.array(s))]
-            constraints.append(cv.sum(x[idxs]) == is_initial(s))
+            idxs = [
+                indexof((0, s, a2idx(a)))
+                for a in self.gridworld.get_legal_actions(np.array(s))
+            ]
+            constraints.append(cp.sum(x[idxs]) == is_initial(s))
 
         # \forall s' \forall l \in 1 .. L-1 -> \sum _{a'} \lambda_{l+1}(s', a') = \sum_{s,a} Pr(s' | s, a) \lambda_l(s,a)
-        for l in range(self.horizon-1):
+        for l in range(self.horizon - 1):
             for sp in self.legal_states:
-
                 s_a_idxs = []
                 probs = []
                 # We obtain the index of each (l, s, a) pair
@@ -171,17 +198,65 @@ class VAPOR(object):
                 for act in self.gridworld.get_legal_actions(sp):
                     s = np.array(sp) - act
                     for a in self.gridworld.get_legal_actions(s):
-                        s_a_idxs.append( indexof( (l, a2idx(s), a2idx(a)) ) )
+                        s_a_idxs.append(indexof((l, a2idx(s), a2idx(a))))
                         probs.append(self.gridworld.get_transition_prob(s, a, sp))
 
                 probs = np.array(probs)
-
-                sp_idxs = [indexof((l+1, sp, a2idx(ap))) for ap in self.gridworld.get_legal_actions(sp)]
-                constraints.append(
-                    cv.sum(x[sp_idxs]) == probs.T @ x[s_a_idxs]
-                )
+                sp_idxs = [
+                    indexof((l + 1, sp, a2idx(ap)))
+                    for ap in self.gridworld.get_legal_actions(sp)
+                ]
+                constraints.append(cp.sum(x[sp_idxs]) == probs.T @ x[s_a_idxs])
 
         return constraints
-            
 
 
+    def get_lambda(self) -> None:
+        x = cp.Variable(len(self.legal_qstates))
+        r = self.curr_rewards
+        s = self.curr_variance
+        objective = cp.Maximize(
+            cp.transpose(x) @ (r + cp.multiply(s, cp.sqrt(-2 * cp.log(x))))
+        )
+        constraints = self.lambda_stat_constraint(x)
+        problem = cp.Problem(objective, constraints)
+        problem.solve(solver=cp.ECOS, abstol=1e-8)
+        self.curr_lambda = problem.value
+
+
+    def lamb(self, l: int, s: np.ndarray, a: np.ndarray) -> float:
+        idx = self.qstate_to_idx[(l, a2idx(s), a2idx(a))]
+        return self.curr_lambda[idx]
+
+
+    def best_value(self, l, s) -> float:
+        """Return the best Q-value for a given state"""
+        legal_actions = self.gridworld.get_legal_actions(s)
+        maximum = self.lamb(l, s, legal_actions[0])
+        for a in legal_actions[1:]:
+            maximum = max(self.lamb(l, s, a), maximum)
+        return maximum
+
+
+    def best_action(self, l, s):
+        """Return the best action for a given state"""
+        legal_actions = self.gridworld.get_legal_actions(s)
+        a = legal_actions[0]
+        best_val = self.lamb(l, s, a)
+        best_act = a
+        for a in legal_actions[1:]:
+            val = self.lamb(l, s, a)
+            if val > best_val:
+                best_val = val
+                best_act = a
+        return best_act
+
+
+    def best_action_epsilon_greedy(self, l, s, epsilon: float = 0.1):
+        if np.random.rand() < epsilon:
+            actions = self.gridworld.get_legal_actions(s)
+            a_idx = np.random.randint(0, len(actions))
+            a = actions[a_idx]
+        else:
+            a = self.best_action(l, s)
+        return a
