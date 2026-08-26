@@ -8,17 +8,18 @@ from enviroment import GridWorld, GridWorldConfig
 from agents import QLearning, VAPOR
 from tqdm import tqdm
 
+
 CONFIG: GridWorldConfig = GridWorldConfig(
     size=15,
     p_walls=0.6,
     agent_start=np.array((0, 0)),
     step_penalty=-(2 ** (-10)),
-    small_treasure_rew=10,
-    treasure_rew=1_000,
+    small_treasure_rew=1,
+    treasure_rew=100,
     sd_small_treasure=1.0,
-    sd_treasure=10.0,
-    temperature=0.01,
-    gamma=0.99,
+    sd_treasure=1.0,
+    temperature=0.1,
+    gamma=0.995,
     random_state=0
 )
 
