@@ -131,7 +131,7 @@ def main_VAPOR():
         # Run episode
         while not gridworld.is_terminated and steps < max_steps_per_episode:
             s = gridworld.agent_pos
-            a = VAPOR_agent.best_action_lambda(s)
+            a = VAPOR_agent.best_action(steps, s)
             reward = gridworld.do_action(a)             # Take action
             total_reward += reward
             steps += 1
@@ -140,7 +140,7 @@ def main_VAPOR():
                 time.sleep(0.01)
 
         # Learn and store episode reward
-        VAPOR_agent.learn_from_episode()
+        VAPOR_agent.update_model_prior(total_reward,)
         episode_rewards.append(total_reward)
 
     # After training
@@ -155,7 +155,7 @@ def main_VAPOR():
         steps = 0
         while not gridworld.is_terminated and steps < max_steps_per_episode:
             s = gridworld.agent_pos
-            a = VAPOR_agent.best_action_lambda(s)
+            a = VAPOR_agent.best_action(steps, s)
 
             reward = gridworld.do_action(a)
             steps += 1
@@ -181,5 +181,5 @@ def main_VAPOR():
 
 if __name__ == "__main__":
     clear_screen()
-    main_QLEARNING()
-    # main_VAPOR()
+    # main_QLEARNING()
+    main_VAPOR()

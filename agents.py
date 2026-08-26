@@ -94,7 +94,7 @@ class VAPOR(object):
         self,
         gridworld: GridWorld,
         terminal_states,
-        horizon: int,
+        horizon: int = -1,
         sigma_prior: float = 1.0,
     ):
         # Gridworld structure
@@ -103,21 +103,13 @@ class VAPOR(object):
         self.gamma = gridworld.gamma
         self.initial_state = a2idx(gridworld.agent_start)
         self.terminal_states = terminal_states
-        self.horizon = horizon
+        if horizon == -1:
+            self.horizon = self.gridworld_size * 2 - 1
+        else:
+            self.horizon = horizon
 
         # Prior paremeters
         self.sigma_prior = sigma_prior
-
-        # Definition of lambda, r, sigma
-        self.curr_lambda: np.ndarray = np.array(
-            0,
-        )  # Current lambda estimate
-        self.curr_rewards: np.ndarray = np.array(
-            0,
-        )  # Current expected rewards
-        self.curr_variance: np.ndarray = np.array(
-            0,
-        )  # Current expected variance
 
         self.qstate_to_idx = (
             {}
@@ -126,8 +118,21 @@ class VAPOR(object):
             []
         )  # Each element is of the form (l, (i,j), a) (timestep, position, action)
         self.legal_states = []
+        
 
         self._init_table()  # Initializes the tables and the arrays
+
+        # Definition of lambda, r, sigma
+        self.curr_lambda: np.ndarray = np.array(
+            [0] * len(self.legal_qstates)
+        )  # Current lambda estimate
+        self.curr_rewards: np.ndarray = np.array(
+            [0] * len(self.legal_qstates)
+        )  # Current expected rewards
+        self.curr_variance: np.ndarray = np.array(
+            [0] * len(self.legal_qstates)
+        )  # Current expected variance
+        
 
 
     def _init_table(self):
