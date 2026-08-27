@@ -301,6 +301,22 @@ class Vapor(object):
         self.curr_lambda = x.value
 
 
+    def learn_from_episode(self, episode, cum_sum:bool=False):
+        lsa_s = [
+            (l, a2idx(s), a2idx(a)) 
+            for l, (s, a, _, _) in zip(range(len(episode)), episode)
+        ]
+        r_s = [r for (_, _, _, r) in episode]
+        returns = compute_returns_np(r_s, self.gamma)
+
+        # Update the buffer of collected rewards
+        for qs, r in zip(lsa_s, r_s):
+            self.reward_buff[qs].add(r)
+
+        self.update_env_model(lsa_s, r_s) # Change the prior on the enviroment
+        self.update_lambda() # Update the env lambdas
+
+
     def lamb(self, l: int, s: np.ndarray, a: np.ndarray) -> float:
         idx = self.qstate_to_idx[(l, a2idx(s), a2idx(a))]
         return self.curr_lambda[idx]
@@ -313,27 +329,6 @@ class Vapor(object):
         for a in legal_actions[1:]:
             maximum = max(self.lamb(l, s, a), maximum)
         return maximum
-
-
-    def learn_from_episode(self, episode, cum_sum:bool=False):
-
-        lsa_s = [
-            (l, a2idx(s), a2idx(a)) 
-            for l, (s, a, _, _) in zip(range(len(episode)), episode)
-        ]
-
-        r_s = [r for (_, _, _, r) in episode]
-        returns = compute_returns_np(r_s, self.gamma)
-
-        # Update the buffer of collected rewards
-        for qs, r in zip(lsa_s, r_s):
-            self.reward_buff[qs].add(r)
-
-        # Change the prior on the enviroment
-        self.update_env_model(lsa_s, r_s)
-
-        # Update the env lambdas
-        self.update_lambda()
 
 
     def best_action(self, l, s):
