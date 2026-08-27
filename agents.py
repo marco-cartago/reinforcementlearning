@@ -250,6 +250,11 @@ class VAPOR(object):
                 # We save the corresponding probability
                 for act in self.gridworld.get_legal_actions(sp):
                     s = np.array(sp) - act
+
+                    # Skip state action combinations that are illegal
+                    if ((a2idx(s), a2idx(act)) not in self.legal_qstates):
+                        continue
+
                     for a in self.gridworld.get_legal_actions(s):
                         s_a_idxs.append(indexof((l, a2idx(s), a2idx(a))))
                         probs.append(self.gridworld.get_transition_prob(s, a, sp))
@@ -264,9 +269,9 @@ class VAPOR(object):
         return constraints
 
 
-    def learn_from_episode(self):
-        episode = self.gridworld.get_episode()
-        lsa_s = [(l, s, a) for l, (s, a, _, _) in zip(range(len(episode)), episode)]
+    def learn_from_episode(self, episode):
+
+        lsa_s = [(l, a2idx(s), a2idx(a)) for l, (s, a, _, _) in zip(range(len(episode)), episode)]
         r_s = [r for (_, _, _, r) in episode]
 
         # Update the buffer of collected rewards
