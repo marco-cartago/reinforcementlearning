@@ -88,7 +88,34 @@ class QLearning(object):
         return a
 
 
+class RepBuffer(object):
+
+    def __init__(self, size: int = 8, seed: int = 0):
+        self.size = size
+        self.filled = 0
+        self.array = np.zeros(size)
+        self.rng = np.random.RandomState(seed)
+
+    def add(self, x):
+        if self.filled < self.size:
+            self.array[self.filled] = x
+            self.filled += 1
+        else:
+            idx = self.rng.randint(self.size)
+            self.array[idx] = x
+
+    def mean(self):
+        return np.mean(self.array)
+
+    def var(self):
+        return np.var(self.array)
+
+
 class VAPOR(object):
+
+    """
+    
+    """
 
     def __init__(
         self,
@@ -112,25 +139,28 @@ class VAPOR(object):
         self.curr_lambda: np.ndarray = np.array(
             0,
         )  # Current lambda estimate
-        self.curr_rewards: np.ndarray = np.array(
-            0,
-        )  # Current expected rewards
-        self.curr_variance: np.ndarray = np.array(
-            0,
-        )  # Current expected variance
 
-        self.qstate_to_idx = (
-            {}
-        )  # Mapping from qstate (l, (i,j), a) to position inside the array
-        self.legal_qstates = (
-            []
-        )  # Each element is of the form (l, (i,j), a) (timestep, position, action)
+        # Used to keep tab of the last k rewards coming from a particular
+        # q-state, so to have, for the bayesian update both a mean and a 
+        # variance. This introduces some bias, but the buffer is kept small.
+        # It is implemented as a dict from a (l, s, a) tuple to a RepBuffer object.
+        self.reward_buff = {}
+
+        # Current expected rewards
+        self.curr_reward_mean: np.ndarray = np.array(0,)  
+        # Current expected variance
+        self.curr_reward_variance: np.ndarray = np.array(0,)  
+
+        # Mapping from qstate (l, (i,j), a) to position inside the array
+        self.qstate_to_idx = {}  
+        # Each element is of the form (l, (i,j), a) (timestep, position, action)
+        self.legal_qstates = []
         self.legal_states = []
 
         self._init_table()  # Initializes the tables and the arrays
 
 
-    def _init_table(self):
+    def _init_table(self, repbuffer_size: int = 5):
         """
         Initializes:
             - List of available legal position in the enviroment
@@ -138,7 +168,6 @@ class VAPOR(object):
 
         """
         gw = self.gridworld
-
         for l in range(self.horizon):
             for i in range(self.gridworld_size):
                 for j in range(self.gridworld_size):
@@ -152,16 +181,35 @@ class VAPOR(object):
         # Establish a mapping between state and vector position
         self.qstate_to_idx = {key: idx for idx, key in enumerate(self.legal_qstates)}
 
-        # Setting up parameters of the model's model of the enviroment
-        self.curr_rewards = np.zeros(len(self.legal_qstates))
-        self.curr_variance = np.zeros_like(self.curr_rewards) + self.sigma_prior
+        # Initializes buffers for the state rewards
+        self.reward_buff = {qs: RepBuffer(size=repbuffer_size, seed=0) for qs in self.legal_qstates}
+
+        # Initialize the priors of the enviroment to be a N(0, sigma_prior)
+        self.curr_reward_mean = np.zeros(len(self.legal_qstates))
+        self.curr_reward_variance = np.zeros_like(self.curr_reward_mean) + self.sigma_prior
 
 
-    def update_model_prior(self, rwp: np.ndarray, sgp: np.ndarray):
-        rw = self.curr_rewards
-        sg = self.curr_variance
-        self.curr_variance = (sg * sgp) / (sg + sgp)
-        self.curr_rewards = self.curr_variance * (rw / sg + rwp / sgp)
+    def update_env_model(self, lsa_s: list, r_s: list[float]):
+        """
+        Performs the bayesian update only on those states wich have been visited.
+        Internally updates the means and the variances, it:
+         1. Estimates mean and reward variance using the `RepBuffer` for that particular q-state
+         2. Locally modifies via byesian update `self.curr_reward_variance` and `self.curr_reward_mean` using the estimates
+        """
+        mu = self.curr_reward_mean
+        s = self.curr_reward_variance
+
+        for qs in lsa_s:
+            # Obtain corrispondence
+            idx = self.qstate_to_idx[qs]
+
+            # Calculate estimates
+            mu_p = self.reward_buff[qs].mean()
+            s_p = self.reward_buff[qs].var() 
+
+            # Update
+            self.curr_reward_variance[idx] = (s[idx] * s_p) / (s[idx] + s_p)
+            self.curr_reward_mean[idx] = self.curr_reward_variance[idx] * (mu[idx] / s[idx] + mu_p / s_p)
 
 
     def lambda_stat_constraint(self, x: cp.Variable):
@@ -211,10 +259,26 @@ class VAPOR(object):
         return constraints
 
 
-    def get_lambda(self) -> None:
+    def learn_from_episode(self):
+        episode = self.gridworld.get_episode()
+        lsa_s = [(l, s, a) for l, (s, a, _, _) in zip(range(len(episode)), episode)]
+        r_s = [r for (_, _, _, r) in episode]
+
+        # Update the buffer of collected rewards
+        for qs, r in zip(lsa_s, r_s):
+            self.reward_buff[qs].add(r)
+
+        # Change the prior on the enviroment
+        self.update_env_model(lsa_s, r_s)
+
+        # Update the env lambdas
+        self.update_lambda()
+
+
+    def update_lambda(self) -> None:
         x = cp.Variable(len(self.legal_qstates))
-        r = self.curr_rewards
-        s = self.curr_variance
+        r = self.curr_reward_mean
+        s = self.curr_reward_variance
         objective = cp.Maximize(
             cp.transpose(x) @ (r + cp.multiply(s, cp.sqrt(-2 * cp.log(x))))
         )
