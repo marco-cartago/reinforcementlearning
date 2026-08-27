@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 
 CONFIG: GridWorldConfig = GridWorldConfig(
-    size=15,
+    size=4,
     p_walls=0.6,
     agent_start=np.array((0, 0)),
     step_penalty=-(2 ** (-10)),
@@ -111,14 +111,13 @@ def main_VAPOR():
 
     # Terminal states are the treasure positions
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
-
-    # Initialize Q-learning agent
-    VAPOR_agent = VAPOR(gridworld, terminal_states)  # , alpha=1)
-
-    n_episodes = 1_000
-    max_steps_per_episode = 100
+    n_episodes = 100
+    max_steps_per_episode = 20
     show_final_path = True
     episode_rewards = []
+
+    # Initialize VAPOR agent
+    VAPOR_agent = VAPOR(gridworld, terminal_states, horizon=max_steps_per_episode)
 
     for episode in tqdm(range(n_episodes)):
         # Reset environment
@@ -140,7 +139,9 @@ def main_VAPOR():
                 time.sleep(0.01)
 
         # Learn and store episode reward
-        VAPOR_agent.update_model_prior(total_reward,)
+        episode = gridworld.get_episode()
+        VAPOR_agent.learn_from_episode(episode)
+
         episode_rewards.append(total_reward)
 
     # After training
