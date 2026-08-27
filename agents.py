@@ -145,10 +145,6 @@ class VAPOR(object):
             []
         )  # Each element is of the form (l, (i,j), a) (timestep, position, action)
 
-        # Definition of lambda, r, sigma
-        self.curr_lambda: np.ndarray = np.array(
-            0,
-        )  # Current lambda estimate
 
         # Used to keep tab of the last k rewards coming from a particular
         # q-state, so to have, for the bayesian update both a mean and a 
@@ -156,10 +152,6 @@ class VAPOR(object):
         # It is implemented as a dict from a (l, s, a) tuple to a RepBuffer object.
         self.reward_buff = {}
 
-        # Current expected rewards
-        self.curr_reward_mean: np.ndarray = np.array(0,)  
-        # Current expected variance
-        self.curr_reward_variance: np.ndarray = np.array(0,)  
 
         # Mapping from qstate (l, (i,j), a) to position inside the array
         self.qstate_to_idx = {}  
@@ -168,11 +160,15 @@ class VAPOR(object):
         self.legal_states = []
         
 
-        self._init_table()  # Initializes the tables and the arrays
+        self._init_table()  # Initializes the tables
+
+        # Initialize enviroment priors
+        self.curr_lambda = np.zeros(len(self.legal_qstates))
+        self.curr_reward_mean = np.zeros(len(self.legal_qstates))
+        self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
 
-
-    def _init_table(self):
+    def _init_table(self, repbuffer_size:int=5):
         """
         Initializes:
             - List of available legal position in the enviroment
@@ -196,9 +192,6 @@ class VAPOR(object):
         # Initializes buffers for the state rewards
         self.reward_buff = {qs: RepBuffer(size=repbuffer_size, seed=0) for qs in self.legal_qstates}
 
-        # Initialize the priors of the enviroment to be a N(0, sigma_prior)
-        self.curr_reward_mean = np.zeros(len(self.legal_qstates))
-        self.curr_reward_variance = np.zeros_like(self.curr_reward_mean) + self.sigma_prior
 
 
     def update_env_model(self, lsa_s: list, r_s: list[float]):
