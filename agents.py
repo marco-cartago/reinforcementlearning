@@ -3,7 +3,8 @@ from enviroment import GridWorld, a2idx
 from scipy.optimize import minimize
 import math
 from copy import deepcopy
-from time import sleep
+from time import sleep, time_ns
+import random
 import cvxpy as cp
 
 
@@ -111,7 +112,7 @@ class RepBuffer(object):
         return np.var(self.array)
 
 
-class VAPOR(object):
+class Vapor(object):
 
     """
     
@@ -161,6 +162,7 @@ class VAPOR(object):
         
 
         self._init_table()  # Initializes the tables
+        #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
         # Initialize enviroment priors
         self.curr_lambda = np.zeros(len(self.legal_qstates))
@@ -193,14 +195,14 @@ class VAPOR(object):
         self.reward_buff = {qs: RepBuffer(size=repbuffer_size, seed=0) for qs in self.legal_qstates}
 
 
-
-    def update_env_model(self, lsa_s: list, r_s: list[float]):
+    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1.0):
         """
         Performs the bayesian update only on those states wich have been visited.
         Internally updates the means and the variances, it:
          1. Estimates mean and reward variance using the `RepBuffer` for that particular q-state
          2. Locally modifies via byesian update `self.curr_reward_variance` and `self.curr_reward_mean` using the estimates
         """
+
         mu = self.curr_reward_mean
         s = self.curr_reward_variance
 
@@ -211,6 +213,7 @@ class VAPOR(object):
             # Calculate estimates
             mu_p = self.reward_buff[qs].mean()
             s_p = self.reward_buff[qs].var() 
+            s_p += noise
 
             # Update
             self.curr_reward_variance[idx] = (s[idx] * s_p) / (s[idx] + s_p)
@@ -225,12 +228,10 @@ class VAPOR(object):
          - `self.qtable_r`
         In terms of sequential order of the unrolled states in list form.
         """
+
         constraints = []
         indexof = lambda s: self.qstate_to_idx[s]
         is_initial = lambda s: 1 if s == self.initial_state else 0
-
-        # Non negativity constraint (a positive constraint ;))
-        constraints.append(x >= 0)
 
         # \ro(s) = \sum _a \lambda_1(s,a)
         # As the agent deterministically starts always in the same position.
@@ -289,7 +290,7 @@ class VAPOR(object):
         self.update_lambda()
 
 
-    def update_lambda(self) -> None:
+    def update_lambda(self, solver: str = "CLARABEL") -> None:
         nv = len(self.legal_qstates) # Number of varaibles
         x = cp.Variable(nv)
         y = cp.Variable(nv) # Auxiluiary variables
@@ -297,7 +298,7 @@ class VAPOR(object):
         s = self.curr_reward_variance
 
         # Modified objective
-        objective = cp.Maximize(cp.sum(cp.multiply(x, r) + y))
+        objective = cp.Minimize(cp.sum(cp.multiply(x, r) + y))
         
         # Additionlal axuiliary variable constrints
         y_constr = [
@@ -308,7 +309,7 @@ class VAPOR(object):
         constraints = y_constr + pos_constraints + self.lambda_stat_constraint(x)
 
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.CLARABEL)
+        problem.solve(solver=solver)
         self.curr_lambda = x.value
 
 
@@ -338,6 +339,12 @@ class VAPOR(object):
                 best_val = val
                 best_act = a
         return best_act
+
+    def sample_action(self, l, s):
+        """Sample an action for a given state according to lambda weights"""
+        legal_actions = self.gridworld.get_legal_actions(s)
+        weights = [self.lamb(l, s, a) for a in legal_actions]
+        return random.choices(legal_actions, weights=weights, k=1)[0]
 
 
     def best_action_epsilon_greedy(self, l, s, epsilon: float = 0.1):
