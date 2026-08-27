@@ -114,17 +114,19 @@ class RepBuffer(object):
             self.array[idx] = x
 
     def mean(self):
-        return np.mean(self.array)
+        if self.filled == 0:
+            return 0.0
+        return np.mean(self.array[:self.filled])
 
     def var(self):
-        return np.var(self.array)
+        if self.filled == 0:
+            return 0.0
+        return np.var(self.array[:self.filled])
 
 
 class Vapor(object):
 
-    """
-    
-    """
+    STAY = (0, 0)
 
     def __init__(
         self,
@@ -169,13 +171,21 @@ class Vapor(object):
         self.legal_states = []
         
 
-        self._init_table()  # Initializes the tables
+        self._init_table(repbuffer_size=self.horizon)  # Initializes the tables
         #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
         # Initialize enviroment priors
         self.curr_lambda = np.zeros(len(self.legal_qstates))
         self.curr_reward_mean = np.zeros(len(self.legal_qstates))
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
+
+        self.terminal_positions = {a2idx(ts) for ts in terminal_states}
+
+        for l in range(self.horizon):
+            for tp in self.terminal_positions:
+                idx = self.qstate_to_idx[(l, tp, self.STAY)]
+                self.curr_reward_mean[idx] = 0.0
+                self.curr_reward_variance[idx] = 1e-8
 
 
     def _init_table(self, repbuffer_size:int=5):
@@ -189,11 +199,15 @@ class Vapor(object):
         for l in range(self.horizon):
             for i in range(self.gridworld_size):
                 for j in range(self.gridworld_size):
-                    if gw.grid[(i, j)] != gw.WALL:
-                        legal_actions = gw.get_legal_actions(np.array([i, j]))
-                        self.legal_states.append((i, j))
-                        for a in legal_actions:
-                            sa = (l, (i, j), a2idx(a))
+                    if gw.grid[(i,j)] == gw.WALL:
+                        continue
+                    self.legal_states.append((i,j))
+                    if (i,j) in [a2idx(gw.treasure_pos), a2idx(gw.small_treasure_pos)]:
+                        sa = (l, (i,j), self.STAY)   # pseudo-azione fissa
+                        self.legal_qstates.append(sa)
+                    else:
+                        for a in gw.get_legal_actions(np.array([i,j])):
+                            sa = (l, (i,j), a2idx(a))
                             self.legal_qstates.append(sa)
 
         # Establish a mapping between state and vector position
@@ -236,46 +250,58 @@ class Vapor(object):
          - `self.qtable_r`
         In terms of sequential order of the unrolled states in list form.
         """
-
         constraints = []
         indexof = lambda s: self.qstate_to_idx[s]
         is_initial = lambda s: 1 if s == self.initial_state else 0
+        is_terminal = lambda s: s in self.terminal_positions
 
-        # \ro(s) = \sum _a \lambda_1(s,a)
-        # As the agent deterministically starts always in the same position.
+        # rho(s) = sum_a lambda_1(s,a)
         for s in self.legal_states:
-            idxs = [
-                indexof((0, s, a2idx(a)))
-                for a in self.gridworld.get_legal_actions(np.array(s))
-            ]
+            if is_terminal(s):
+                idxs = [indexof((0, s, self.STAY))]
+            else:
+                idxs = [
+                    indexof((0, s, a2idx(a)))
+                    for a in self.gridworld.get_legal_actions(np.array(s))
+                ]
             constraints.append(cp.sum(x[idxs]) == is_initial(s))
 
-        # \forall s' \forall l \in 1 .. L-1 -> \sum _{a'} \lambda_{l+1}(s', a') = \sum_{s,a} Pr(s' | s, a) \lambda_l(s,a)
         for l in range(self.horizon - 1):
             for sp in self.legal_states:
                 s_a_idxs = []
                 probs = []
-                # We obtain the index of each (l, s, a) pair
-                # We save the corresponding probability
-                for act in self.gridworld.get_legal_actions(sp):
-                    s = np.array(sp) - act
 
-                    # Skip state action combinations that are illegal
-                    if ((a2idx(s), a2idx(act)) not in self.legal_qstates):
+                # Self-loop: massa che resta nel terminale da un layer all'altro
+                if is_terminal(sp):
+                    s_a_idxs.append(indexof((l, sp, self.STAY)))
+                    probs.append(1.0)
+
+                # Arrivi "reali" da vicini non terminali
+                for act in self.gridworld.get_legal_actions(np.array(sp)):
+                    s = a2idx(np.array(sp) - act)
+
+                    # Il fix del bug 1: check sul dict, tupla a 3 elementi
+                    if (l, s, a2idx(act)) not in self.qstate_to_idx:
                         continue
 
-                    for a in self.gridworld.get_legal_actions(s):
-                        s_a_idxs.append(indexof((l, a2idx(s), a2idx(a))))
-                        probs.append(self.gridworld.get_transition_prob(s, a, sp))
+                    for a in self.gridworld.get_legal_actions(np.array(s)):
+                        s_a_idxs.append(indexof((l, s, a2idx(a))))
+                        probs.append(self.gridworld.get_transition_prob(np.array(s), a, np.array(sp)))
 
                 probs = np.array(probs)
-                sp_idxs = [
-                    indexof((l + 1, sp, a2idx(ap)))
-                    for ap in self.gridworld.get_legal_actions(sp)
-                ]
-                constraints.append(cp.sum(x[sp_idxs]) == probs.T @ x[s_a_idxs])
+
+                if is_terminal(sp):
+                    sp_idxs = [indexof((l + 1, sp, self.STAY))]
+                else:
+                    sp_idxs = [
+                        indexof((l + 1, sp, a2idx(ap)))
+                        for ap in self.gridworld.get_legal_actions(np.array(sp))
+                    ]
+
+                constraints.append(cp.sum(x[sp_idxs]) == probs @ x[s_a_idxs])
 
         return constraints
+
 
 
     def update_lambda(self, solver: str = "CLARABEL") -> None:
@@ -290,7 +316,7 @@ class Vapor(object):
         
         # Additionlal axuiliary variable constrints
         y_constr = [
-            cp.quad_over_lin(y[i], x[i]) <= 2 * (s[i]**2) * cp.entr(x[i]) 
+            cp.quad_over_lin(y[i], x[i]) <= 2 * s[i] * cp.entr(x[i]) 
             for i in range(nv)
         ]
         pos_constraints = [x >= 0, y >= 0]
