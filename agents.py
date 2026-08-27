@@ -290,23 +290,25 @@ class VAPOR(object):
 
 
     def update_lambda(self) -> None:
-        x = cp.Variable(len(self.legal_qstates))
-        y = cp.Variable(len(self.legal_qstates)) # Auxiluiary variable
+        nv = len(self.legal_qstates) # Number of varaibles
+        x = cp.Variable(nv)
+        y = cp.Variable(nv) # Auxiluiary variables
         r = self.curr_reward_mean
         s = self.curr_reward_variance
-        
+
         # Modified objective
         objective = cp.Maximize(cp.sum(cp.multiply(x, r) + y))
         
         # Additionlal axuiliary variable constrints
-        auxil_constraints = [
-            cp.quad_over_lin(y, x) <= 2 * (s**2) * cp.entr(x),
-            x >= 0, 
-            y >= 0
+        y_constr = [
+            cp.quad_over_lin(y[i], x[i]) <= 2 * (s[i]**2) * cp.entr(x[i]) 
+            for i in range(nv)
         ]
-        constraints = auxil_constraints + self.lambda_stat_constraint(x)
+        pos_constraints = [x >= 0, y >= 0]
+        constraints = y_constr + pos_constraints + self.lambda_stat_constraint(x)
+
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.ECOS, abstol=1e-8)
+        problem.solve(solver=cp.CLARABEL)
         self.curr_lambda = x.value
 
 
