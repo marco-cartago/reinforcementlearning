@@ -121,7 +121,7 @@ class VAPOR(object):
         self,
         gridworld: GridWorld,
         terminal_states,
-        horizon: int,
+        horizon: int = -1,
         sigma_prior: float = 1.0,
     ):
         # Gridworld structure
@@ -130,10 +130,20 @@ class VAPOR(object):
         self.gamma = gridworld.gamma
         self.initial_state = a2idx(gridworld.agent_start)
         self.terminal_states = terminal_states
-        self.horizon = horizon
+        if horizon == -1:
+            self.horizon = self.gridworld_size * 2 - 1
+        else:
+            self.horizon = horizon
 
         # Prior paremeters
         self.sigma_prior = sigma_prior
+
+        self.qstate_to_idx = (
+            {}
+        )  # Mapping from qstate (l, (i,j), a) to position inside the array
+        self.legal_qstates = (
+            []
+        )  # Each element is of the form (l, (i,j), a) (timestep, position, action)
 
         # Definition of lambda, r, sigma
         self.curr_lambda: np.ndarray = np.array(
@@ -156,11 +166,13 @@ class VAPOR(object):
         # Each element is of the form (l, (i,j), a) (timestep, position, action)
         self.legal_qstates = []
         self.legal_states = []
+        
 
         self._init_table()  # Initializes the tables and the arrays
 
 
-    def _init_table(self, repbuffer_size: int = 5):
+
+    def _init_table(self):
         """
         Initializes:
             - List of available legal position in the enviroment
