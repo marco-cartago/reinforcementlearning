@@ -7,6 +7,14 @@ from time import sleep, time_ns
 import random
 import cvxpy as cp
 
+def compute_returns_np(r, gamma):
+    r = np.array(r)
+    returns = np.zeros_like(r, dtype=float)
+    g = 0
+    for t in reversed(range(len(r))):
+        g = r[t] + gamma * g
+        returns[t] = g
+    return returns
 
 class QLearning(object):
 
@@ -270,26 +278,6 @@ class Vapor(object):
         return constraints
 
 
-    def learn_from_episode(self, episode):
-
-        lsa_s = [
-            (l, a2idx(s), a2idx(a)) 
-            for l, (s, a, _, _) in zip(range(len(episode)), episode)
-        ]
-        
-        r_s = [r for (_, _, _, r) in episode]
-
-        # Update the buffer of collected rewards
-        for qs, r in zip(lsa_s, r_s):
-            self.reward_buff[qs].add(r)
-
-        # Change the prior on the enviroment
-        self.update_env_model(lsa_s, r_s)
-
-        # Update the env lambdas
-        self.update_lambda()
-
-
     def update_lambda(self, solver: str = "CLARABEL") -> None:
         nv = len(self.legal_qstates) # Number of varaibles
         x = cp.Variable(nv)
@@ -298,7 +286,7 @@ class Vapor(object):
         s = self.curr_reward_variance
 
         # Modified objective
-        objective = cp.Minimize(cp.sum(cp.multiply(x, r) + y))
+        objective = cp.Maximize(cp.sum(cp.multiply(x, r) + y))
         
         # Additionlal axuiliary variable constrints
         y_constr = [
@@ -327,6 +315,27 @@ class Vapor(object):
         return maximum
 
 
+    def learn_from_episode(self, episode, cum_sum:bool=False):
+
+        lsa_s = [
+            (l, a2idx(s), a2idx(a)) 
+            for l, (s, a, _, _) in zip(range(len(episode)), episode)
+        ]
+
+        r_s = [r for (_, _, _, r) in episode]
+        returns = compute_returns_np(r_s, self.gamma)
+
+        # Update the buffer of collected rewards
+        for qs, r in zip(lsa_s, r_s):
+            self.reward_buff[qs].add(r)
+
+        # Change the prior on the enviroment
+        self.update_env_model(lsa_s, r_s)
+
+        # Update the env lambdas
+        self.update_lambda()
+
+
     def best_action(self, l, s):
         """Return the best action for a given state"""
         legal_actions = self.gridworld.get_legal_actions(s)
@@ -340,10 +349,17 @@ class Vapor(object):
                 best_act = a
         return best_act
 
+
     def sample_action(self, l, s):
         """Sample an action for a given state according to lambda weights"""
         legal_actions = self.gridworld.get_legal_actions(s)
-        weights = [self.lamb(l, s, a) for a in legal_actions]
+        if len(legal_actions) == 1:
+            return legal_actions[0]
+
+        weights = [float(self.lamb(l, s, a)) + 1e-8 for a in legal_actions]
+        
+        tot_weights = sum(weights)
+        weights = [w / tot_weights for w in weights]
         return random.choices(legal_actions, weights=weights, k=1)[0]
 
 

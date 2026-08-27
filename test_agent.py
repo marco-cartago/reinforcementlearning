@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 CONFIG: GridWorldConfig = GridWorldConfig(
     size=5,
-    p_walls=0.7,
+    p_walls=0.6,
     agent_start=np.array((0, 0)),
     step_penalty=-(2 ** (-10)),
     small_treasure_rew=1,
@@ -22,7 +22,7 @@ CONFIG: GridWorldConfig = GridWorldConfig(
     gamma=0.995,
     random_state=0
 )
-MAX_STEPS_PER_EPISODE = 10
+MAX_STEPS_PER_EPISODE = 15
 
 
 def clear_screen():
@@ -130,19 +130,21 @@ def main_VAPOR():
         # Run episode
         while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
             s = gridworld.agent_pos
-            a = VAPOR_agent.best_action(steps, s)
+            a = VAPOR_agent.sample_action(steps, s)
             reward = gridworld.do_action(a)             # Take action
             total_reward += reward
             steps += 1
             if ep % 10 == 0:
                 print(gridworld)
-                time.sleep(1.0)
+                time.sleep(0.01)
 
         # Learn and store episode reward
         episode = gridworld.get_episode()
         VAPOR_agent.learn_from_episode(episode)
 
         episode_rewards.append(total_reward)
+
+    input("Press enter to continue...")
 
     # After training
     if show_final_path:
