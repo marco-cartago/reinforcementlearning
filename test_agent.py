@@ -5,13 +5,13 @@ import subprocess
 import matplotlib.pyplot as plt
 
 from enviroment import GridWorld, GridWorldConfig
-from agents import QLearning, VAPOR
+from agents import QLearning, Vapor
 from tqdm import tqdm
 
 
 CONFIG: GridWorldConfig = GridWorldConfig(
-    size=4,
-    p_walls=0.6,
+    size=5,
+    p_walls=0.7,
     agent_start=np.array((0, 0)),
     step_penalty=-(2 ** (-10)),
     small_treasure_rew=1,
@@ -22,6 +22,7 @@ CONFIG: GridWorldConfig = GridWorldConfig(
     gamma=0.995,
     random_state=0
 )
+MAX_STEPS_PER_EPISODE = 10
 
 
 def clear_screen():
@@ -39,7 +40,7 @@ def main_QLEARNING():
     # Initialize Q-learning agent
     q_agent = QLearning(gridworld, terminal_states, alpha=1)
     n_episodes = 20_000
-    max_steps_per_episode = 1_000
+    max_steps_per_episode = MAX_STEPS_PER_EPISODE
     show_final_path = True
     episode_rewards = []
 
@@ -112,14 +113,13 @@ def main_VAPOR():
     # Terminal states are the treasure positions
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
     n_episodes = 100
-    max_steps_per_episode = 20
     show_final_path = True
     episode_rewards = []
 
     # Initialize VAPOR agent
-    VAPOR_agent = VAPOR(gridworld, terminal_states, horizon=max_steps_per_episode)
+    VAPOR_agent = Vapor(gridworld, terminal_states, horizon=MAX_STEPS_PER_EPISODE)
 
-    for episode in tqdm(range(n_episodes)):
+    for ep in tqdm(range(n_episodes)):
         # Reset environment
         gridworld = GridWorld(CONFIG)
         gridworld.reset()
@@ -128,15 +128,15 @@ def main_VAPOR():
         VAPOR_agent.gridworld = gridworld
 
         # Run episode
-        while not gridworld.is_terminated and steps < max_steps_per_episode:
+        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
             s = gridworld.agent_pos
             a = VAPOR_agent.best_action(steps, s)
             reward = gridworld.do_action(a)             # Take action
             total_reward += reward
             steps += 1
-            if episode % 100 == 0:
-                # print(gridworld)
-                time.sleep(0.01)
+            if ep % 10 == 0:
+                print(gridworld)
+                time.sleep(1.0)
 
         # Learn and store episode reward
         episode = gridworld.get_episode()
@@ -154,21 +154,22 @@ def main_VAPOR():
         gridworld.reset()
 
         steps = 0
-        while not gridworld.is_terminated and steps < max_steps_per_episode:
+        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
             s = gridworld.agent_pos
             a = VAPOR_agent.best_action(steps, s)
-
             reward = gridworld.do_action(a)
             steps += 1
+
             clear_screen()
             print(gridworld)
-            time.sleep(0.05)  # Slow down for visualization
+            time.sleep(2.0)  # Slow down for visualization
 
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
 
-    for l in VAPOR_agent.table_lambda.keys():
-        print(l, VAPOR_agent.table_lambda[l])
+    print("Q-state -> lambda")
+    for i in range(len(VAPOR_agent.legal_qstates)):
+        print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
 
     # Plot rewards
     plt.figure(figsize=(10, 5))
