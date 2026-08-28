@@ -171,7 +171,8 @@ def main_VAPOR():
 
     print("Q-state -> lambda")
     for i in range(len(VAPOR_agent.legal_qstates)):
-        print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
+        if VAPOR_agent.curr_lambda[i] > 1e-7:
+            print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
 
     # Plot rewards
     plt.figure(figsize=(10, 5))

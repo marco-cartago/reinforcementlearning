@@ -224,23 +224,16 @@ class Vapor(object):
          1. Estimates mean and reward variance using the `RepBuffer` for that particular q-state
          2. Locally modifies via byesian update `self.curr_reward_variance` and `self.curr_reward_mean` using the estimates
         """
-
         mu = self.curr_reward_mean
         s = self.curr_reward_variance
 
-        for qs in lsa_s:
-            # Obtain corrispondence
+        for qs, r in zip(lsa_s, r_s):
             idx = self.qstate_to_idx[qs]
+            mu_p = r
+            s_p = noise
 
-            # Calculate estimates
-            mu_p = self.reward_buff[qs].mean()
-            s_p = self.reward_buff[qs].var() 
-            s_p += noise
-
-            # Update
             self.curr_reward_variance[idx] = (s[idx] * s_p) / (s[idx] + s_p)
             self.curr_reward_mean[idx] = self.curr_reward_variance[idx] * (mu[idx] / s[idx] + mu_p / s_p)
-
 
     def lambda_stat_constraint(self, x: cp.Variable):
         """
