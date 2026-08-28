@@ -10,13 +10,13 @@ from utils import GridWorldConfig
 from agents import QLearning, Vapor
 from tqdm import tqdm
 
-
+SIZE = 20
 CONFIG: GridWorldConfig = GridWorldConfig(
-    size=5,
-    p_walls=0.7,
+    size=SIZE,
+    p_walls=0.8,
     agent_start=np.array((0, 0)),
-    step_penalty=-(2 ** (-1)),
-    small_treasure_rew=1e-2,
+    step_penalty=-(2 ** (-10)),
+    small_treasure_rew=1e-3,
     treasure_rew=1,
     sd_small_treasure=1e-3,
     sd_treasure=1e-3,
