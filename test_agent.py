@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from utils import a2idx
 from enviroment import GridWorld
 from utils import GridWorldConfig
-from agents import QLearning, Vapor
+from agents import QLearning, Vapor, SoftQLearning
 from tqdm import tqdm
 
 
@@ -88,6 +88,85 @@ def main_QLEARNING():
         while not gridworld.is_terminated and steps < max_steps_per_episode:
             s = gridworld.agent_pos
             a = q_agent.best_action(s)
+            reward = gridworld.do_action(a)
+            steps += 1
+            clear_screen()
+            print(gridworld)
+            time.sleep(0.1)  # Slow down for visualization
+
+        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
+        print(f"Steps taken: {steps}")
+
+    # Plot rewards
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(episode_rewards)
+    plt.title("Reward per Episode")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.grid(True)
+    plt.show()
+
+
+def main_SoftQLEARNING():
+    # Initialize the environment
+    gridworld = GridWorld(CONFIG)
+
+    # Terminal states are the treasure positions
+    terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
+
+    TEMPERATURE = 1.0
+
+    # Initialize Q-learning agent
+    soft_q_agent = SoftQLearning(gridworld, terminal_states, alpha=1, temperature=TEMPERATURE)
+    n_episodes = 20_000
+    max_steps_per_episode = MAX_STEPS_PER_EPISODE
+    show_final_path = True
+    episode_rewards = []
+
+    for episode in tqdm(range(n_episodes)):
+        # Reset environment
+        gridworld = GridWorld(CONFIG)
+        gridworld.reset()
+        steps = 0
+        total_reward = 0
+        soft_q_agent.gridworld = gridworld
+        soft_q_agent.alpha = 0.1 * (1 - episode / n_episodes)  # Decaying learning rate
+        soft_q_agent.temperature = 0.5 * (1 - episode / n_episodes)
+
+        # Run episode
+        while not gridworld.is_terminated and steps < max_steps_per_episode:
+            s = gridworld.agent_pos
+            a = soft_q_agent.sample_action(s)
+            # Take action
+            reward = gridworld.do_action(a)
+            total_reward += reward
+            steps += 1
+            if episode % 10_000 == 0:
+                print(gridworld)
+                time.sleep(0.01)
+
+        # Learn
+        soft_q_agent.learn_from_episode()
+
+        # Store episode reward
+        episode_rewards.append(total_reward)
+
+
+    # After training
+    if show_final_path:
+        clear_screen()
+        print("\n=== Final Learned Path ===")
+
+        # Reset environment for final demonstration
+        gridworld = GridWorld(CONFIG)
+        gridworld.reset()
+        steps = 0
+
+        while not gridworld.is_terminated and steps < max_steps_per_episode:
+            s = gridworld.agent_pos
+            a = soft_q_agent.best_action(s)
             reward = gridworld.do_action(a)
             steps += 1
             clear_screen()
@@ -190,4 +269,5 @@ def main_VAPOR():
 if __name__ == "__main__":
     clear_screen()
     # main_QLEARNING()
-    main_VAPOR()
+    # main_VAPOR()
+    main_SoftQLEARNING()

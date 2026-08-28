@@ -377,3 +377,79 @@ class Vapor(object):
         else:
             a = self.best_action(l, s)
         return a
+
+
+class SoftQLearning(object):
+    def __init__(self, gridworld, terminal_states, alpha=0.1, temperature=1.0):
+        self.gridworld = gridworld
+        self.gridworld_size = gridworld.size
+        self.alpha = alpha
+        self.gamma = gridworld.gamma
+        self.temperature = temperature
+        self.terminal_states = terminal_states
+        self.table = {}
+        self.__init_table()
+
+    def __init_table(self):
+            table = {}
+            for i in range(self.gridworld_size):
+                for j in range(self.gridworld_size):
+                    if self.gridworld.grid[(i, j)] != self.gridworld.WALL:
+                        for a in self.gridworld.get_legal_actions(np.array([i, j])):
+                            table[((i, j), a2idx(a))] = 0
+    
+            for a in [
+                self.gridworld.UP,
+                self.gridworld.DOWN,
+                self.gridworld.LEFT,
+                self.gridworld.RIGHT,
+            ]:
+                table[(a2idx(self.gridworld.treasure_pos), a2idx(a))] = 0
+                table[(a2idx(self.gridworld.small_treasure_pos), a2idx(a))] = 0
+    
+            self.table = table
+
+    def soft_value(self, s) -> float:
+
+        legal_actions = self.gridworld.get_legal_actions(s)
+        qs = np.array([self.Q(s, a) for a in legal_actions])
+        m = np.max(qs / self.temperature)
+        return self.temperature * (m + np.log(np.sum(np.exp(qs/self.temperature - m))))
+
+    def learn_from_episode(self):
+
+        episode = self.gridworld.get_episode()
+        for (s, a, s_next, r) in episode:
+            if tuple(s_next) in [tuple(self.gridworld.treasure_pos), tuple(self.gridworld.small_treasure_pos)]:
+                target = r  # stato terminale: nessun bootstrap, Eq. 13
+            else:
+                target = r + self.gamma * self.soft_value(s_next)  # Eq. 15
+            qs = (a2idx(s), a2idx(a))
+            self.table[qs] = (1 - self.alpha) * self.Q(s, a) + self.alpha * target
+
+    def Q(self, s: np.ndarray, a: np.ndarray) -> float:
+            return self.table.get((a2idx(s), a2idx(a)), 0.0)
+    
+
+    def sample_action(self, s):
+
+        legal_actions = self.gridworld.get_legal_actions(s)
+        qs = np.array([self.Q(s, a) for a in legal_actions])
+        v = self.soft_value(s)
+        probs = np.exp((qs - v) / self.temperature)
+        probs /= probs.sum()
+        idx = np.random.choice(len(legal_actions), p=probs)
+        return legal_actions[idx]
+
+    def best_action(self, s):
+            """Return the best action for a given state"""
+            legal_actions = self.gridworld.get_legal_actions(s)
+            a = legal_actions[0]
+            best_val = self.Q(s, a)
+            best_act = a
+            for a in legal_actions[1:]:
+                val = self.Q(s, a)
+                if val > best_val:
+                    best_val = val
+                    best_act = a
+            return best_act
