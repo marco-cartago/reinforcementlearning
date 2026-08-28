@@ -271,11 +271,14 @@ class Vapor(object):
                     indexof((l + 1, sp, a2idx(ap)))
                     for ap in self.gridworld.get_legal_actions(sp)
                 ]
-                constraints.append(cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[s_a_idxs], probs)) if len(s_a_idxs) else cp.sum(x[sp_idxs]) == 0)
+                constraints.append(
+                    cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[s_a_idxs], probs)) 
+                    if len(s_a_idxs) else cp.sum(x[sp_idxs]) == 0
+                )
 
         return constraints
 
-    def update_lambda(self, solver: str = "SCS", verbose: bool = False) -> None:
+    def update_lambda(self, solver: str = "CLARABEL", verbose: bool = False) -> None:
         nv = len(self.legal_qstates) # Number of varaibles
         x = cp.Variable(nv)
         y = cp.Variable(nv) # Auxiluiary variables

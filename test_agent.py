@@ -10,10 +10,10 @@ from utils import GridWorldConfig
 from agents import QLearning, Vapor
 from tqdm import tqdm
 
-SIZE = 20
+SIZE = 8
 CONFIG: GridWorldConfig = GridWorldConfig(
     size=SIZE,
-    p_walls=0.8,
+    p_walls=0.70,
     agent_start=np.array((0, 0)),
     step_penalty=-(2 ** (-10)),
     small_treasure_rew=1e-3,
@@ -22,9 +22,9 @@ CONFIG: GridWorldConfig = GridWorldConfig(
     sd_treasure=1e-3,
     temperature=0.0,
     gamma=0.995,
-    random_state=0
+    random_state=4
 )
-MAX_STEPS_PER_EPISODE = 10
+MAX_STEPS_PER_EPISODE = int(3 * SIZE)
 N_EPISODES = 100
 
 
@@ -42,7 +42,7 @@ def main_QLEARNING():
 
     # Initialize Q-learning agent
     q_agent = QLearning(gridworld, terminal_states, alpha=1)
-    n_episodes = 20_000
+    n_episodes = N_EPISODES
     max_steps_per_episode = MAX_STEPS_PER_EPISODE
     show_final_path = True
     episode_rewards = []
@@ -64,7 +64,7 @@ def main_QLEARNING():
             reward = gridworld.do_action(a)
             total_reward += reward
             steps += 1
-            if episode % 10_000 == 0:
+            if episode % 10 == 0:
                 print(gridworld)
                 time.sleep(0.01)
 
@@ -106,7 +106,7 @@ def main_QLEARNING():
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"./figures/run_q_{time.time_ns()}")
 
 
 def main_VAPOR():
@@ -147,7 +147,7 @@ def main_VAPOR():
 
         episode_rewards.append(total_reward)
 
-    input("Press enter to continue...")
+    # input("Press enter to continue...")
 
     # After training
     if show_final_path:
@@ -192,10 +192,11 @@ def main_VAPOR():
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"./figures/run_vapor_{time.time_ns()}")
 
 
 if __name__ == "__main__":
     clear_screen()
-    # main_QLEARNING()
+    main_QLEARNING()
+    clear_screen()
     main_VAPOR()
