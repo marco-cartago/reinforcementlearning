@@ -172,18 +172,10 @@ def main_VAPOR():
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
 
-    # print("Q-state -> lambda")
-    # for i in range(len(VAPOR_agent.legal_qstates)):
-    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
-
-    # print("Q-state -> Er")
-    # for i in range(len(VAPOR_agent.legal_qstates)):
-    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_mean[i]}")
-
-    # print("Q-state -> Var")
-    # for i in range(len(VAPOR_agent.legal_qstates)):
-    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_variance[i]}")
-
+    print("Q-state -> lambda")
+    for i in range(len(VAPOR_agent.legal_qstates)):
+        if VAPOR_agent.curr_lambda[i] > 1e-7:
+            print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
 
     # Plot rewards
     plt.figure(figsize=(10, 5))

@@ -110,6 +110,9 @@ class RepBuffer(object):
         if self.filled == 0:
             return 0.0
         return np.mean(self.array[:self.filled])
+        if self.filled == 0:
+            return 0.0
+        return np.mean(self.array[:self.filled])
 
     def var(self):
         if self.filled == 0:
@@ -118,9 +121,7 @@ class RepBuffer(object):
 
 class Vapor(object):
 
-    """
-    
-    """
+    STAY = (0, 0)
 
     def __init__(
         self,
@@ -165,13 +166,21 @@ class Vapor(object):
         self.legal_states = []
         
 
-        self._init_table()  # Initializes the tables
+        self._init_table(repbuffer_size=self.horizon)  # Initializes the tables
         #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
         # Initialize enviroment priors
         self.curr_lambda = np.zeros(len(self.legal_qstates))
         self.curr_reward_mean = np.zeros(len(self.legal_qstates))
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
+
+        self.terminal_positions = {a2idx(ts) for ts in terminal_states}
+
+        for l in range(self.horizon):
+            for tp in self.terminal_positions:
+                idx = self.qstate_to_idx[(l, tp, self.STAY)]
+                self.curr_reward_mean[idx] = 0.0
+                self.curr_reward_variance[idx] = 1e-8
 
 
     def _init_table(self, repbuffer_size:int=3):
@@ -209,23 +218,16 @@ class Vapor(object):
          1. Estimates mean and reward variance using the `RepBuffer` for that particular q-state
          2. Locally modifies via byesian update `self.curr_reward_variance` and `self.curr_reward_mean` using the estimates
         """
-
         mu = self.curr_reward_mean
         s = self.curr_reward_variance
 
-        for qs in lsa_s:
-            # Obtain corrispondence
+        for qs, r in zip(lsa_s, r_s):
             idx = self.qstate_to_idx[qs]
+            mu_p = r
+            s_p = noise
 
-            # Calculate estimates
-            mu_p = self.reward_buff[qs].mean()
-            s_p = self.reward_buff[qs].var() 
-            s_p += noise
-
-            # Update
             self.curr_reward_variance[idx] = (s[idx] * s_p) / (s[idx] + s_p)
             self.curr_reward_mean[idx] = self.curr_reward_variance[idx] * (mu[idx] / s[idx] + mu_p / s_p)
-
 
     def lambda_stat_constraint(self, x: cp.Variable):
         """
@@ -235,21 +237,22 @@ class Vapor(object):
          - `self.qtable_r`
         In terms of sequential order of the unrolled states in list form.
         """
-
         constraints = []
         indexof = lambda s: self.qstate_to_idx[s]
         is_initial = lambda s: 1 if s == self.initial_state else 0
+        is_terminal = lambda s: s in self.terminal_positions
 
-        # \ro(s) = \sum _a \lambda_1(s,a)
-        # As the agent deterministically starts always in the same position.
+        # rho(s) = sum_a lambda_1(s,a)
         for s in self.legal_states:
-            idxs = [
-                indexof((0, s, a2idx(a)))
-                for a in self.gridworld.get_legal_actions(np.array(s))
-            ]
+            if is_terminal(s):
+                idxs = [indexof((0, s, self.STAY))]
+            else:
+                idxs = [
+                    indexof((0, s, a2idx(a)))
+                    for a in self.gridworld.get_legal_actions(np.array(s))
+                ]
             constraints.append(cp.sum(x[idxs]) == is_initial(s))
 
-        # \forall s' \forall l \in 1 .. L-1 -> \sum _{a'} \lambda_{l+1}(s', a') = \sum_{s,a} Pr(s' | s, a) \lambda_l(s,a)
         for l in range(self.horizon - 1):
             for sp in self.legal_states:
                 s_a_idxs = []
@@ -267,11 +270,16 @@ class Vapor(object):
                         probs.append(p)
 
                 probs = np.array(probs)
-                sp_idxs = [
-                    indexof((l + 1, sp, a2idx(ap)))
-                    for ap in self.gridworld.get_legal_actions(sp)
-                ]
-                constraints.append(cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[s_a_idxs], probs)) if len(s_a_idxs) else cp.sum(x[sp_idxs]) == 0)
+
+                if is_terminal(sp):
+                    sp_idxs = [indexof((l + 1, sp, self.STAY))]
+                else:
+                    sp_idxs = [
+                        indexof((l + 1, sp, a2idx(ap)))
+                        for ap in self.gridworld.get_legal_actions(np.array(sp))
+                    ]
+
+                constraints.append(cp.sum(x[sp_idxs]) == probs @ x[s_a_idxs])
 
         return constraints
 
