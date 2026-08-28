@@ -2,41 +2,7 @@ import numpy as np
 import random
 from copy import deepcopy
 
-def a2idx(a: np.ndarray) -> tuple:
-    """Convert a numpy array to a tuple"""
-    return (int(a[0]), int(a[1]))
-
-class GridWorldConfig(object): 
-
-    def __init__(
-        self, 
-        size: int, 
-        p_walls: float, 
-        agent_start: np.ndarray, 
-        step_penalty: float, 
-        small_treasure_rew: float, 
-        treasure_rew: float, 
-        sd_treasure: float, 
-        sd_small_treasure: float, 
-        temperature: float = 0.1, 
-        gamma: float = 0.99, 
-        random_state: int = 0
-    ):
-        self.size = size 
-        self.p_walls = p_walls
-        self.agent_start = agent_start
-        self.step_penalty = step_penalty
-        self.small_treasure_rew = small_treasure_rew
-        self.treasure_rew = treasure_rew
-        self.sd_treasure = sd_treasure
-        self.sd_small_treasure = sd_small_treasure
-        self.temperature = temperature
-        self.gamma = gamma
-        self.random_state = random_state
-
-    def __repr__(self):
-        params = "\n  ".join([f"{k}={v}" for k, v in self.__dict__.items()])
-        return f"GridWorldConfig(\n  {params}\n)"
+from utils import GridWorldConfig, a2idx
 
 class GridWorld(object):
     
@@ -228,7 +194,10 @@ class GridWorld(object):
 
 
     def do_action(self, move: np.ndarray) -> float:
-        """Moves the agent in the gridworld and returns the reward for that action, does not check for the legality of the action"""
+        """
+        Moves the agent in the gridworld and returns the reward for that action,
+        does not check for the legality of the action
+        """
 
         # Perform a random action with probability temperature
         if np.random.rand() < self.temperature:
