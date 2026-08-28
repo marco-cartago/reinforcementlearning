@@ -4,25 +4,28 @@ import os
 import subprocess
 import matplotlib.pyplot as plt
 
-from enviroment import GridWorld, GridWorldConfig
+from utils import a2idx
+from enviroment import GridWorld
+from utils import GridWorldConfig
 from agents import QLearning, Vapor
 from tqdm import tqdm
 
 
 CONFIG: GridWorldConfig = GridWorldConfig(
     size=5,
-    p_walls=0.6,
+    p_walls=0.7,
     agent_start=np.array((0, 0)),
-    step_penalty=-(2 ** (-10)),
-    small_treasure_rew=1,
-    treasure_rew=100,
-    sd_small_treasure=1.0,
-    sd_treasure=1.0,
-    temperature=0.1,
+    step_penalty=-(2 ** (-1)),
+    small_treasure_rew=1e-2,
+    treasure_rew=1,
+    sd_small_treasure=1e-3,
+    sd_treasure=1e-3,
+    temperature=0.0,
     gamma=0.995,
     random_state=0
 )
-MAX_STEPS_PER_EPISODE = 15
+MAX_STEPS_PER_EPISODE = 10
+N_EPISODES = 100
 
 
 def clear_screen():
@@ -111,8 +114,8 @@ def main_VAPOR():
     gridworld = GridWorld(CONFIG)
 
     # Terminal states are the treasure positions
-    terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
-    n_episodes = 100
+    terminal_states = [a2idx(gridworld.treasure_pos), a2idx(gridworld.small_treasure_pos)]
+    n_episodes = N_EPISODES
     show_final_path = True
     episode_rewards = []
 
@@ -130,13 +133,13 @@ def main_VAPOR():
         # Run episode
         while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
             s = gridworld.agent_pos
-            a = VAPOR_agent.sample_action(steps, s)
+            a = VAPOR_agent.sample_action(steps, s, eps=1e-8)
             reward = gridworld.do_action(a)             # Take action
             total_reward += reward
             steps += 1
             if ep % 10 == 0:
                 print(gridworld)
-                time.sleep(0.01)
+                time.sleep(0.1)
 
         # Learn and store episode reward
         episode = gridworld.get_episode()
@@ -162,16 +165,25 @@ def main_VAPOR():
             reward = gridworld.do_action(a)
             steps += 1
 
+            time.sleep(1.0)  # Slow down for visualization
             clear_screen()
             print(gridworld)
-            time.sleep(2.0)  # Slow down for visualization
 
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
 
-    print("Q-state -> lambda")
-    for i in range(len(VAPOR_agent.legal_qstates)):
-        print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
+    # print("Q-state -> lambda")
+    # for i in range(len(VAPOR_agent.legal_qstates)):
+    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
+
+    # print("Q-state -> Er")
+    # for i in range(len(VAPOR_agent.legal_qstates)):
+    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_mean[i]}")
+
+    # print("Q-state -> Var")
+    # for i in range(len(VAPOR_agent.legal_qstates)):
+    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_variance[i]}")
+
 
     # Plot rewards
     plt.figure(figsize=(10, 5))
