@@ -10,21 +10,21 @@ from utils import GridWorldConfig
 from agents import QLearning, Vapor, SoftQLearning
 from tqdm import tqdm
 
-
+SIZE = 8
 CONFIG: GridWorldConfig = GridWorldConfig(
-    size=5,
-    p_walls=0.7,
+    size=SIZE,
+    p_walls=0.70,
     agent_start=np.array((0, 0)),
-    step_penalty=-(2 ** (-1)),
-    small_treasure_rew=1e-2,
+    step_penalty=-(2 ** (-10)),
+    small_treasure_rew=1e-3,
     treasure_rew=1,
     sd_small_treasure=1e-3,
     sd_treasure=1e-3,
     temperature=0.0,
     gamma=0.995,
-    random_state=0
+    random_state=4
 )
-MAX_STEPS_PER_EPISODE = 10
+MAX_STEPS_PER_EPISODE = int(3 * SIZE)
 N_EPISODES = 100
 
 
@@ -42,7 +42,7 @@ def main_QLEARNING():
 
     # Initialize Q-learning agent
     q_agent = QLearning(gridworld, terminal_states, alpha=1)
-    n_episodes = 20_000
+    n_episodes = N_EPISODES
     max_steps_per_episode = MAX_STEPS_PER_EPISODE
     show_final_path = True
     episode_rewards = []
@@ -64,7 +64,7 @@ def main_QLEARNING():
             reward = gridworld.do_action(a)
             total_reward += reward
             steps += 1
-            if episode % 10_000 == 0:
+            if episode % 10 == 0:
                 print(gridworld)
                 time.sleep(0.01)
 
@@ -106,7 +106,94 @@ def main_QLEARNING():
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.grid(True)
-    plt.show()
+    plt.savefig(f"./figures/run_q_{time.time_ns()}")
+
+
+def main_VAPOR():
+    # Initialize the environment
+    gridworld = GridWorld(CONFIG)
+
+    # Terminal states are the treasure positions
+    terminal_states = [a2idx(gridworld.treasure_pos), a2idx(gridworld.small_treasure_pos)]
+    n_episodes = N_EPISODES
+    show_final_path = True
+    episode_rewards = []
+
+    # Initialize VAPOR agent
+    VAPOR_agent = Vapor(gridworld, terminal_states, horizon=MAX_STEPS_PER_EPISODE)
+
+    for ep in tqdm(range(n_episodes)):
+        # Reset environment
+        gridworld = GridWorld(CONFIG)
+        gridworld.reset()
+        steps = 0
+        total_reward = 0
+        VAPOR_agent.gridworld = gridworld
+
+        # Run episode
+        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
+            s = gridworld.agent_pos
+            a = VAPOR_agent.sample_action(steps, s, eps=1e-8)
+            reward = gridworld.do_action(a)             # Take action
+            total_reward += reward
+            steps += 1
+            if ep % 10 == 0:
+                print(gridworld)
+                time.sleep(0.1)
+
+        # Learn and store episode reward
+        episode = gridworld.get_episode()
+        VAPOR_agent.learn_from_episode(episode)
+
+        episode_rewards.append(total_reward)
+
+    # input("Press enter to continue...")
+
+    # After training
+    if show_final_path:
+        clear_screen()
+        print("\n=== Final Learned Path ===")
+
+        # Reset environment for final demonstration
+        gridworld = GridWorld(CONFIG)
+        gridworld.reset()
+
+        steps = 0
+        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
+            s = gridworld.agent_pos
+            a = VAPOR_agent.best_action(steps, s)
+            reward = gridworld.do_action(a)
+            steps += 1
+
+            time.sleep(1.0)  # Slow down for visualization
+            clear_screen()
+            print(gridworld)
+
+        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
+        print(f"Steps taken: {steps}")
+
+    # print("Q-state -> lambda")
+    # for i in range(len(VAPOR_agent.legal_qstates)):
+    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
+
+    # print("Q-state -> Er")
+    # for i in range(len(VAPOR_agent.legal_qstates)):
+    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_mean[i]}")
+
+    # print("Q-state -> Var")
+    # for i in range(len(VAPOR_agent.legal_qstates)):
+    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_variance[i]}")
+
+
+    # Plot rewards
+    plt.figure(figsize=(10, 5))
+    plt.plot(episode_rewards)
+    plt.title("Reward per Episode")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.grid(True)
+    plt.savefig(f"./figures/run_vapor_{time.time_ns()}")
+
 
 
 def main_SoftQLEARNING():
@@ -116,10 +203,13 @@ def main_SoftQLEARNING():
     # Terminal states are the treasure positions
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
 
-    TEMPERATURE = 1.0
+    temp_start = 2.0
+    temp_end = 0.2
+
+    power_fraction = 0.3
 
     # Initialize Q-learning agent
-    soft_q_agent = SoftQLearning(gridworld, terminal_states, alpha=1, temperature=TEMPERATURE)
+    soft_q_agent = SoftQLearning(gridworld, terminal_states, alpha=1, temperature=temp_start)
     n_episodes = 20_000
     max_steps_per_episode = MAX_STEPS_PER_EPISODE
     show_final_path = True
@@ -132,8 +222,8 @@ def main_SoftQLEARNING():
         steps = 0
         total_reward = 0
         soft_q_agent.gridworld = gridworld
-        soft_q_agent.alpha = 0.1 * (1 - episode / n_episodes)  # Decaying learning rate
-        soft_q_agent.temperature = 0.5 * (1 - episode / n_episodes)
+        soft_q_agent.alpha = 0.1 * (1 - (episode - 1) / n_episodes)  # Decaying learning rate
+        soft_q_agent.temp_explore = temp_start * (temp_end/temp_start)**((episode/n_episodes)/power_fraction)
 
         # Run episode
         while not gridworld.is_terminated and steps < max_steps_per_episode:
@@ -188,86 +278,10 @@ def main_SoftQLEARNING():
     plt.show()
 
 
-def main_VAPOR():
-    # Initialize the environment
-    gridworld = GridWorld(CONFIG)
-
-    # Terminal states are the treasure positions
-    terminal_states = [a2idx(gridworld.treasure_pos), a2idx(gridworld.small_treasure_pos)]
-    n_episodes = N_EPISODES
-    show_final_path = True
-    episode_rewards = []
-
-    # Initialize VAPOR agent
-    VAPOR_agent = Vapor(gridworld, terminal_states, horizon=MAX_STEPS_PER_EPISODE)
-
-    for ep in tqdm(range(n_episodes)):
-        # Reset environment
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-        steps = 0
-        total_reward = 0
-        VAPOR_agent.gridworld = gridworld
-
-        # Run episode
-        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
-            s = gridworld.agent_pos
-            a = VAPOR_agent.sample_action(steps, s, eps=1e-8)
-            reward = gridworld.do_action(a)             # Take action
-            total_reward += reward
-            steps += 1
-            if ep % 10 == 0:
-                print(gridworld)
-                time.sleep(0.1)
-
-        # Learn and store episode reward
-        episode = gridworld.get_episode()
-        VAPOR_agent.learn_from_episode(episode)
-
-        episode_rewards.append(total_reward)
-
-    input("Press enter to continue...")
-
-    # After training
-    if show_final_path:
-        clear_screen()
-        print("\n=== Final Learned Path ===")
-
-        # Reset environment for final demonstration
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-
-        steps = 0
-        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
-            s = gridworld.agent_pos
-            a = VAPOR_agent.best_action(steps, s)
-            reward = gridworld.do_action(a)
-            steps += 1
-
-            time.sleep(1.0)  # Slow down for visualization
-            clear_screen()
-            print(gridworld)
-
-        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-        print(f"Steps taken: {steps}")
-
-    print("Q-state -> lambda")
-    for i in range(len(VAPOR_agent.legal_qstates)):
-        if VAPOR_agent.curr_lambda[i] > 1e-7:
-            print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
-
-    # Plot rewards
-    plt.figure(figsize=(10, 5))
-    plt.plot(episode_rewards)
-    plt.title("Reward per Episode")
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.grid(True)
-    plt.show()
-
 
 if __name__ == "__main__":
     clear_screen()
     # main_QLEARNING()
+    clear_screen()
     # main_VAPOR()
     main_SoftQLEARNING()

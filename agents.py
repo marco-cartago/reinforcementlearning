@@ -385,7 +385,8 @@ class SoftQLearning(object):
         self.gridworld_size = gridworld.size
         self.alpha = alpha
         self.gamma = gridworld.gamma
-        self.temperature = temperature
+        self.temp_learn = 0.1
+        self.temp_explore = temperature
         self.terminal_states = terminal_states
         self.table = {}
         self.__init_table()
@@ -409,15 +410,23 @@ class SoftQLearning(object):
     
             self.table = table
 
-    def soft_value(self, s) -> float:
-
+    def soft_value(self, s, temperature=None) -> float:
+        temp = temperature if temperature is not None else self.temp_learn
         legal_actions = self.gridworld.get_legal_actions(s)
         qs = np.array([self.Q(s, a) for a in legal_actions])
-        m = np.max(qs / self.temperature)
-        return self.temperature * (m + np.log(np.sum(np.exp(qs/self.temperature - m))))
+        m = np.max(qs / temp)
+        return temp * (m + np.log(np.sum(np.exp(qs/temp - m))))
 
+    def sample_action(self, s):
+        legal_actions = self.gridworld.get_legal_actions(s)
+        qs = np.array([self.Q(s, a) for a in legal_actions])
+        v = self.soft_value(s, temperature=self.temp_explore)  # temperatura diversa qui
+        probs = np.exp((qs - v) / self.temp_explore)
+        probs /= probs.sum()
+        idx = np.random.choice(len(legal_actions), p=probs)
+        return legal_actions[idx]
+    
     def learn_from_episode(self):
-
         episode = self.gridworld.get_episode()
         for (s, a, s_next, r) in episode:
             if tuple(s_next) in [tuple(self.gridworld.treasure_pos), tuple(self.gridworld.small_treasure_pos)]:
@@ -430,16 +439,6 @@ class SoftQLearning(object):
     def Q(self, s: np.ndarray, a: np.ndarray) -> float:
             return self.table.get((a2idx(s), a2idx(a)), 0.0)
     
-
-    def sample_action(self, s):
-
-        legal_actions = self.gridworld.get_legal_actions(s)
-        qs = np.array([self.Q(s, a) for a in legal_actions])
-        v = self.soft_value(s)
-        probs = np.exp((qs - v) / self.temperature)
-        probs /= probs.sum()
-        idx = np.random.choice(len(legal_actions), p=probs)
-        return legal_actions[idx]
 
     def best_action(self, s):
             """Return the best action for a given state"""
