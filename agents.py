@@ -1,5 +1,5 @@
 import numpy as np
-from enviroment import GridWorld, a2idx
+from enviroment import GridWorld
 from scipy.optimize import minimize
 import math
 from copy import deepcopy
@@ -7,14 +7,7 @@ from time import sleep, time_ns
 import random
 import cvxpy as cp
 
-def compute_returns_np(r, gamma):
-    r = np.array(r)
-    returns = np.zeros_like(r, dtype=float)
-    g = 0
-    for t in reversed(range(len(r))):
-        g = r[t] + gamma * g
-        returns[t] = g
-    return returns
+from utils import compute_returns_np, a2idx
 
 class QLearning(object):
 
@@ -114,11 +107,14 @@ class RepBuffer(object):
             self.array[idx] = x
 
     def mean(self):
-        return np.mean(self.array)
+        if self.filled == 0:
+            return 0.0
+        return np.mean(self.array[:self.filled])
 
     def var(self):
-        return np.var(self.array)
-
+        if self.filled == 0:
+            return 0.0
+        return np.var(self.array[:self.filled])
 
 class Vapor(object):
 
@@ -178,7 +174,7 @@ class Vapor(object):
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
 
-    def _init_table(self, repbuffer_size:int=5):
+    def _init_table(self, repbuffer_size:int=3):
         """
         Initializes:
             - List of available legal position in the enviroment
@@ -189,9 +185,12 @@ class Vapor(object):
         for l in range(self.horizon):
             for i in range(self.gridworld_size):
                 for j in range(self.gridworld_size):
-                    if gw.grid[(i, j)] != gw.WALL:
+                    if not (gw.grid[(i, j)] == gw.WALL or ((i,j) in self.terminal_states)):
                         legal_actions = gw.get_legal_actions(np.array([i, j]))
-                        self.legal_states.append((i, j))
+
+                        if l == 0:
+                            self.legal_states.append((i, j))
+
                         for a in legal_actions:
                             sa = (l, (i, j), a2idx(a))
                             self.legal_qstates.append(sa)
@@ -200,10 +199,10 @@ class Vapor(object):
         self.qstate_to_idx = {key: idx for idx, key in enumerate(self.legal_qstates)}
 
         # Initializes buffers for the state rewards
-        self.reward_buff = {qs: RepBuffer(size=repbuffer_size, seed=0) for qs in self.legal_qstates}
+        self.reward_buff = {qs: RepBuffer(size=repbuffer_size, seed=i) for i, qs in enumerate(self.legal_qstates)}
 
 
-    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1.0):
+    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-1):
         """
         Performs the bayesian update only on those states wich have been visited.
         Internally updates the means and the variances, it:
@@ -255,30 +254,28 @@ class Vapor(object):
             for sp in self.legal_states:
                 s_a_idxs = []
                 probs = []
-                # We obtain the index of each (l, s, a) pair
-                # We save the corresponding probability
-                for act in self.gridworld.get_legal_actions(sp):
-                    s = np.array(sp) - act
-
-                    # Skip state action combinations that are illegal
-                    if ((a2idx(s), a2idx(act)) not in self.legal_qstates):
-                        continue
-
-                    for a in self.gridworld.get_legal_actions(s):
-                        s_a_idxs.append(indexof((l, a2idx(s), a2idx(a))))
-                        probs.append(self.gridworld.get_transition_prob(s, a, sp))
+                for s in self.legal_states:
+                    for a in self.gridworld.get_legal_actions(np.array(s)):
+                        # only keep (s, a) pairs whose successor could be sp
+                        p = self.gridworld.get_transition_prob(s, a, sp)
+                        if p == 0:
+                            continue
+                        qs = (l, s, a2idx(a))
+                        if qs not in self.qstate_to_idx:
+                            continue
+                        s_a_idxs.append(indexof(qs))
+                        probs.append(p)
 
                 probs = np.array(probs)
                 sp_idxs = [
                     indexof((l + 1, sp, a2idx(ap)))
                     for ap in self.gridworld.get_legal_actions(sp)
                 ]
-                constraints.append(cp.sum(x[sp_idxs]) == probs.T @ x[s_a_idxs])
+                constraints.append(cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[s_a_idxs], probs)) if len(s_a_idxs) else cp.sum(x[sp_idxs]) == 0)
 
         return constraints
 
-
-    def update_lambda(self, solver: str = "CLARABEL") -> None:
+    def update_lambda(self, solver: str = "SCS", verbose: bool = False) -> None:
         nv = len(self.legal_qstates) # Number of varaibles
         x = cp.Variable(nv)
         y = cp.Variable(nv) # Auxiluiary variables
@@ -290,24 +287,29 @@ class Vapor(object):
         
         # Additionlal axuiliary variable constrints
         y_constr = [
-            cp.quad_over_lin(y[i], x[i]) <= 2 * (s[i]**2) * cp.entr(x[i]) 
+            cp.quad_over_lin(y[i], x[i]) <= 2 * (s[i]) * cp.entr(x[i]) 
             for i in range(nv)
         ]
         pos_constraints = [x >= 0, y >= 0]
         constraints = y_constr + pos_constraints + self.lambda_stat_constraint(x)
 
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=solver)
+
+        try:
+            problem.solve(solver=solver, verbose=verbose)
+        except Exception as e:
+            print(e)
+
         self.curr_lambda = x.value
 
 
-    def learn_from_episode(self, episode, cum_sum:bool=False):
+    def learn_from_episode(self, episode):
         lsa_s = [
             (l, a2idx(s), a2idx(a)) 
             for l, (s, a, _, _) in zip(range(len(episode)), episode)
         ]
         r_s = [r for (_, _, _, r) in episode]
-        returns = compute_returns_np(r_s, self.gamma)
+        #returns = compute_returns_np(r_s, self.gamma)
 
         # Update the buffer of collected rewards
         for qs, r in zip(lsa_s, r_s):
@@ -345,13 +347,13 @@ class Vapor(object):
         return best_act
 
 
-    def sample_action(self, l, s):
+    def sample_action(self, l, s, eps=1e-8):
         """Sample an action for a given state according to lambda weights"""
         legal_actions = self.gridworld.get_legal_actions(s)
         if len(legal_actions) == 1:
             return legal_actions[0]
 
-        weights = [float(self.lamb(l, s, a)) + 1e-8 for a in legal_actions]
+        weights = [float(self.lamb(l, s, a)) + eps for a in legal_actions]
         
         tot_weights = sum(weights)
         weights = [w / tot_weights for w in weights]
