@@ -194,14 +194,15 @@ class Vapor(object):
         for l in range(self.horizon):
             for i in range(self.gridworld_size):
                 for j in range(self.gridworld_size):
-                    if not (gw.grid[(i, j)] == gw.WALL or ((i,j) in self.terminal_states)):
-                        legal_actions = gw.get_legal_actions(np.array([i, j]))
-
-                        if l == 0:
-                            self.legal_states.append((i, j))
-
-                        for a in legal_actions:
-                            sa = (l, (i, j), a2idx(a))
+                    if gw.grid[(i,j)] == gw.WALL:
+                        continue
+                    self.legal_states.append((i,j))
+                    if (i,j) in [a2idx(gw.treasure_pos), a2idx(gw.small_treasure_pos)]:
+                        sa = (l, (i,j), self.STAY)   # pseudo-azione fissa
+                        self.legal_qstates.append(sa)
+                    else:
+                        for a in gw.get_legal_actions(np.array([i,j])):
+                            sa = (l, (i,j), a2idx(a))
                             self.legal_qstates.append(sa)
 
         # Establish a mapping between state and vector position
