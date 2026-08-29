@@ -106,7 +106,7 @@ def main_QLEARNING():
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.grid(True)
-    plt.savefig(f"./figures/run_q_{time.time_ns()}")
+    #plt.savefig(f"./figures/run_q_{time.time_ns()}")
 
 
 def main_VAPOR():
@@ -192,7 +192,7 @@ def main_VAPOR():
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.grid(True)
-    plt.savefig(f"./figures/run_vapor_{time.time_ns()}")
+    #plt.savefig(f"./figures/run_vapor_{time.time_ns()}")
 
 
 
@@ -203,10 +203,8 @@ def main_SoftQLEARNING():
     # Terminal states are the treasure positions
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
 
-    temp_start = 2.0
-    temp_end = 0.2
-
-    power_fraction = 0.3
+    temp_start = 1.3
+    temp_end = 0.05
 
     # Initialize Q-learning agent
     soft_q_agent = SoftQLearning(gridworld, terminal_states, alpha=1, temperature=temp_start)
@@ -222,8 +220,11 @@ def main_SoftQLEARNING():
         steps = 0
         total_reward = 0
         soft_q_agent.gridworld = gridworld
-        soft_q_agent.alpha = 0.1 * (1 - (episode - 1) / n_episodes)  # Decaying learning rate
-        soft_q_agent.temp_explore = temp_start * (temp_end/temp_start)**((episode/n_episodes)/power_fraction)
+        soft_q_agent.alpha = 0.2 * (1 - episode / n_episodes)  # Decaying learning rate
+        if episode > n_episodes/2:
+            soft_q_agent.temperature = temp_start * (temp_end / temp_start) ** ((episode-n_episodes/2) / (n_episodes/2))
+        else:
+            soft_q_agent.temperature = temp_start
 
         # Run episode
         while not gridworld.is_terminated and steps < max_steps_per_episode:
@@ -265,6 +266,18 @@ def main_SoftQLEARNING():
 
         print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
         print(f"Steps taken: {steps}")
+
+    # Dopo il training, prima del plot:
+    print("Path finale (greedy):")
+    gridworld_test = GridWorld(CONFIG)
+    gridworld_test.reset()
+    steps = 0
+    while not gridworld_test.is_terminated and steps < MAX_STEPS_PER_EPISODE:
+        s = gridworld_test.agent_pos
+        a = soft_q_agent.best_action(s)
+        print(f"  step {steps}: pos={s}, action={a}, Q values: {[(tuple(la), soft_q_agent.Q(s, la)) for la in gridworld_test.get_legal_actions(s)]}")
+        gridworld_test.do_action(a)
+        steps += 1
 
     # Plot rewards
     import matplotlib.pyplot as plt

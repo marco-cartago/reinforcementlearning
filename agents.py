@@ -110,9 +110,6 @@ class RepBuffer(object):
         if self.filled == 0:
             return 0.0
         return np.mean(self.array[:self.filled])
-        if self.filled == 0:
-            return 0.0
-        return np.mean(self.array[:self.filled])
 
     def var(self):
         if self.filled == 0:
@@ -121,7 +118,9 @@ class RepBuffer(object):
 
 class Vapor(object):
 
-    STAY = (0, 0)
+    """
+    
+    """
 
     def __init__(
         self,
@@ -166,21 +165,13 @@ class Vapor(object):
         self.legal_states = []
         
 
-        self._init_table(repbuffer_size=self.horizon)  # Initializes the tables
+        self._init_table()  # Initializes the tables
         #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
         # Initialize enviroment priors
         self.curr_lambda = np.zeros(len(self.legal_qstates))
         self.curr_reward_mean = np.zeros(len(self.legal_qstates))
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
-
-        self.terminal_positions = {a2idx(ts) for ts in terminal_states}
-
-        for l in range(self.horizon):
-            for tp in self.terminal_positions:
-                idx = self.qstate_to_idx[(l, tp, self.STAY)]
-                self.curr_reward_mean[idx] = 0.0
-                self.curr_reward_variance[idx] = 1e-8
 
 
     def _init_table(self, repbuffer_size:int=3):
@@ -194,15 +185,14 @@ class Vapor(object):
         for l in range(self.horizon):
             for i in range(self.gridworld_size):
                 for j in range(self.gridworld_size):
-                    if gw.grid[(i,j)] == gw.WALL:
-                        continue
-                    self.legal_states.append((i,j))
-                    if (i,j) in [a2idx(gw.treasure_pos), a2idx(gw.small_treasure_pos)]:
-                        sa = (l, (i,j), self.STAY)   # pseudo-azione fissa
-                        self.legal_qstates.append(sa)
-                    else:
-                        for a in gw.get_legal_actions(np.array([i,j])):
-                            sa = (l, (i,j), a2idx(a))
+                    if not (gw.grid[(i, j)] == gw.WALL or ((i,j) in self.terminal_states)):
+                        legal_actions = gw.get_legal_actions(np.array([i, j]))
+
+                        if l == 0:
+                            self.legal_states.append((i, j))
+
+                        for a in legal_actions:
+                            sa = (l, (i, j), a2idx(a))
                             self.legal_qstates.append(sa)
 
         # Establish a mapping between state and vector position
@@ -219,16 +209,23 @@ class Vapor(object):
          1. Estimates mean and reward variance using the `RepBuffer` for that particular q-state
          2. Locally modifies via byesian update `self.curr_reward_variance` and `self.curr_reward_mean` using the estimates
         """
+
         mu = self.curr_reward_mean
         s = self.curr_reward_variance
 
-        for qs, r in zip(lsa_s, r_s):
+        for qs in lsa_s:
+            # Obtain corrispondence
             idx = self.qstate_to_idx[qs]
-            mu_p = r
-            s_p = noise
 
+            # Calculate estimates
+            mu_p = self.reward_buff[qs].mean()
+            s_p = self.reward_buff[qs].var() 
+            s_p += noise
+
+            # Update
             self.curr_reward_variance[idx] = (s[idx] * s_p) / (s[idx] + s_p)
             self.curr_reward_mean[idx] = self.curr_reward_variance[idx] * (mu[idx] / s[idx] + mu_p / s_p)
+
 
     def lambda_stat_constraint(self, x: cp.Variable):
         """
@@ -238,22 +235,21 @@ class Vapor(object):
          - `self.qtable_r`
         In terms of sequential order of the unrolled states in list form.
         """
+
         constraints = []
         indexof = lambda s: self.qstate_to_idx[s]
         is_initial = lambda s: 1 if s == self.initial_state else 0
-        is_terminal = lambda s: s in self.terminal_positions
 
-        # rho(s) = sum_a lambda_1(s,a)
+        # \ro(s) = \sum _a \lambda_1(s,a)
+        # As the agent deterministically starts always in the same position.
         for s in self.legal_states:
-            if is_terminal(s):
-                idxs = [indexof((0, s, self.STAY))]
-            else:
-                idxs = [
-                    indexof((0, s, a2idx(a)))
-                    for a in self.gridworld.get_legal_actions(np.array(s))
-                ]
+            idxs = [
+                indexof((0, s, a2idx(a)))
+                for a in self.gridworld.get_legal_actions(np.array(s))
+            ]
             constraints.append(cp.sum(x[idxs]) == is_initial(s))
 
+        # \forall s' \forall l \in 1 .. L-1 -> \sum _{a'} \lambda_{l+1}(s', a') = \sum_{s,a} Pr(s' | s, a) \lambda_l(s,a)
         for l in range(self.horizon - 1):
             for sp in self.legal_states:
                 s_a_idxs = []
@@ -271,20 +267,18 @@ class Vapor(object):
                         probs.append(p)
 
                 probs = np.array(probs)
-
-                if is_terminal(sp):
-                    sp_idxs = [indexof((l + 1, sp, self.STAY))]
-                else:
-                    sp_idxs = [
-                        indexof((l + 1, sp, a2idx(ap)))
-                        for ap in self.gridworld.get_legal_actions(np.array(sp))
-                    ]
-
-                constraints.append(cp.sum(x[sp_idxs]) == probs @ x[s_a_idxs])
+                sp_idxs = [
+                    indexof((l + 1, sp, a2idx(ap)))
+                    for ap in self.gridworld.get_legal_actions(sp)
+                ]
+                constraints.append(
+                    cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[s_a_idxs], probs)) 
+                    if len(s_a_idxs) else cp.sum(x[sp_idxs]) == 0
+                )
 
         return constraints
 
-    def update_lambda(self, solver: str = "SCS", verbose: bool = False) -> None:
+    def update_lambda(self, solver: str = "CLARABEL", verbose: bool = False) -> None:
         nv = len(self.legal_qstates) # Number of varaibles
         x = cp.Variable(nv)
         y = cp.Variable(nv) # Auxiluiary variables
@@ -380,75 +374,75 @@ class Vapor(object):
 
 
 class SoftQLearning(object):
+ 
     def __init__(self, gridworld, terminal_states, alpha=0.1, temperature=1.0):
         self.gridworld = gridworld
         self.gridworld_size = gridworld.size
         self.alpha = alpha
         self.gamma = gridworld.gamma
-        self.temp_learn = 0.1
-        self.temp_explore = temperature
+        self.temperature = temperature  # unica temperatura, Eq. 15 e 16
         self.terminal_states = terminal_states
         self.table = {}
         self.__init_table()
-
+ 
     def __init_table(self):
-            table = {}
-            for i in range(self.gridworld_size):
-                for j in range(self.gridworld_size):
-                    if self.gridworld.grid[(i, j)] != self.gridworld.WALL:
-                        for a in self.gridworld.get_legal_actions(np.array([i, j])):
-                            table[((i, j), a2idx(a))] = 0
-    
-            for a in [
-                self.gridworld.UP,
-                self.gridworld.DOWN,
-                self.gridworld.LEFT,
-                self.gridworld.RIGHT,
-            ]:
-                table[(a2idx(self.gridworld.treasure_pos), a2idx(a))] = 0
-                table[(a2idx(self.gridworld.small_treasure_pos), a2idx(a))] = 0
-    
-            self.table = table
-
-    def soft_value(self, s, temperature=None) -> float:
-        temp = temperature if temperature is not None else self.temp_learn
+        table = {}
+        for i in range(self.gridworld_size):
+            for j in range(self.gridworld_size):
+                if self.gridworld.grid[(i, j)] != self.gridworld.WALL:
+                    for a in self.gridworld.get_legal_actions(np.array([i, j])):
+                        table[((i, j), a2idx(a))] = 0
+ 
+        for a in [
+            self.gridworld.UP,
+            self.gridworld.DOWN,
+            self.gridworld.LEFT,
+            self.gridworld.RIGHT,
+        ]:
+            table[(a2idx(self.gridworld.treasure_pos), a2idx(a))] = 0
+            table[(a2idx(self.gridworld.small_treasure_pos), a2idx(a))] = 0
+ 
+        self.table = table
+ 
+    def Q(self, s: np.ndarray, a: np.ndarray) -> float:
+        return self.table.get((a2idx(s), a2idx(a)), 0.0)
+ 
+    def soft_value(self, s) -> float:
+        """V(s) = temperature * log sum_a exp(Q(s,a)/temperature) -- Eq. 21"""
         legal_actions = self.gridworld.get_legal_actions(s)
         qs = np.array([self.Q(s, a) for a in legal_actions])
-        m = np.max(qs / temp)
-        return temp * (m + np.log(np.sum(np.exp(qs/temp - m))))
-
+        m = np.max(qs / self.temperature)
+        return self.temperature * (m + np.log(np.sum(np.exp(qs / self.temperature - m))))
+ 
     def sample_action(self, s):
+        """pi(a|s) = exp((Q(s,a) - V(s)) / temperature) -- Eq. 16"""
         legal_actions = self.gridworld.get_legal_actions(s)
         qs = np.array([self.Q(s, a) for a in legal_actions])
-        v = self.soft_value(s, temperature=self.temp_explore)  # temperatura diversa qui
-        probs = np.exp((qs - v) / self.temp_explore)
+        v = self.soft_value(s)
+        probs = np.exp((qs - v) / self.temperature)
         probs /= probs.sum()
         idx = np.random.choice(len(legal_actions), p=probs)
         return legal_actions[idx]
-    
+ 
     def learn_from_episode(self):
         episode = self.gridworld.get_episode()
         for (s, a, s_next, r) in episode:
             if tuple(s_next) in [tuple(self.gridworld.treasure_pos), tuple(self.gridworld.small_treasure_pos)]:
-                target = r  # stato terminale: nessun bootstrap, Eq. 13
+                target = r  # Eq. 13: stato terminale, nessun bootstrap
             else:
                 target = r + self.gamma * self.soft_value(s_next)  # Eq. 15
             qs = (a2idx(s), a2idx(a))
             self.table[qs] = (1 - self.alpha) * self.Q(s, a) + self.alpha * target
-
-    def Q(self, s: np.ndarray, a: np.ndarray) -> float:
-            return self.table.get((a2idx(s), a2idx(a)), 0.0)
-    
-
+ 
     def best_action(self, s):
-            """Return the best action for a given state"""
-            legal_actions = self.gridworld.get_legal_actions(s)
-            a = legal_actions[0]
-            best_val = self.Q(s, a)
-            best_act = a
-            for a in legal_actions[1:]:
-                val = self.Q(s, a)
-                if val > best_val:
-                    best_val = val
-                    best_act = a
-            return best_act
+        """Policy greedy (argmax Q) per la valutazione finale, non usata in training"""
+        legal_actions = self.gridworld.get_legal_actions(s)
+        a = legal_actions[0]
+        best_val = self.Q(s, a)
+        best_act = a
+        for a in legal_actions[1:]:
+            val = self.Q(s, a)
+            if val > best_val:
+                best_val = val
+                best_act = a
+        return best_act
