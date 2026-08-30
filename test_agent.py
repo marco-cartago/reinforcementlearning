@@ -203,8 +203,8 @@ def main_SoftQLEARNING():
     # Terminal states are the treasure positions
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
 
-    temp_start = 1.3
-    temp_end = 0.05
+    temp_start = 5e-3
+    temp_end = 1e-4
 
     # Initialize Q-learning agent
     soft_q_agent = SoftQLearning(gridworld, terminal_states, alpha=1, temperature=temp_start)
@@ -221,10 +221,8 @@ def main_SoftQLEARNING():
         total_reward = 0
         soft_q_agent.gridworld = gridworld
         soft_q_agent.alpha = 0.2 * (1 - episode / n_episodes)  # Decaying learning rate
-        if episode > n_episodes/2:
-            soft_q_agent.temperature = temp_start * (temp_end / temp_start) ** ((episode-n_episodes/2) / (n_episodes/2))
-        else:
-            soft_q_agent.temperature = temp_start
+        soft_q_agent.temperature = temp_start * (temp_end / temp_start) ** (episode/n_episodes)
+
 
         # Run episode
         while not gridworld.is_terminated and steps < max_steps_per_episode:
