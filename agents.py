@@ -9,7 +9,54 @@ import cvxpy as cp
 
 from utils import compute_returns_np, a2idx
 
-class QLearning(object):
+
+class Agent(object):
+
+    def __init__(self, *args, **kwargs):
+        """Initialization of the agent"""
+        raise NotImplementedError
+
+    def learn_from_episode(self, *args, **kwargs):
+        """For learning from an episode"""
+        raise NotImplementedError
+
+    def get_action(self, *args, **kwargs):
+        """Preferred way for the model to generate an action in the enviroment during training"""
+        raise NotImplementedError
+
+    def best_action(self, *args, **kwargs):
+        """Used to generate actions during the evauation of the model"""
+        raise NotImplementedError
+
+
+class RepBuffer(object):
+
+    def __init__(self, size: int = 8, seed: int = 0):
+        self.size = size
+        self.filled = 0
+        self.array = np.zeros(size)
+        self.rng = np.random.RandomState(seed)
+
+    def add(self, x):
+        if self.filled < self.size:
+            self.array[self.filled] = x
+            self.filled += 1
+        else:
+            idx = self.rng.randint(self.size)
+            self.array[idx] = x
+
+    def mean(self):
+        if self.filled == 0:
+            return 0.0
+        return np.mean(self.array[:self.filled])
+
+    def var(self):
+        if self.filled == 0:
+            return 0.0
+        return np.var(self.array[:self.filled])
+
+
+class QLearning(Agent):
 
     def __init__(self, gridworld: GridWorld, terminal_states, alpha=0.01):
         self.gridworld = gridworld
@@ -79,6 +126,7 @@ class QLearning(object):
                 best_act = a
         return best_act
 
+
     def best_action_epsilon_greedy(self, s, epsilon: float = 0.1):
         if np.random.rand() < epsilon:
             actions = self.gridworld.get_legal_actions(s)
@@ -90,37 +138,12 @@ class QLearning(object):
         return a
 
 
-class RepBuffer(object):
+    def get_action(self, *args, **kwargs):
+        return self.best_action_epsilon_greedy(*args, **kwargs)
 
-    def __init__(self, size: int = 8, seed: int = 0):
-        self.size = size
-        self.filled = 0
-        self.array = np.zeros(size)
-        self.rng = np.random.RandomState(seed)
 
-    def add(self, x):
-        if self.filled < self.size:
-            self.array[self.filled] = x
-            self.filled += 1
-        else:
-            idx = self.rng.randint(self.size)
-            self.array[idx] = x
 
-    def mean(self):
-        if self.filled == 0:
-            return 0.0
-        return np.mean(self.array[:self.filled])
-
-    def var(self):
-        if self.filled == 0:
-            return 0.0
-        return np.var(self.array[:self.filled])
-
-class Vapor(object):
-
-    """
-    
-    """
+class Vapor(Agent):
 
     def __init__(
         self,
@@ -363,6 +386,10 @@ class Vapor(object):
         return random.choices(legal_actions, weights=weights, k=1)[0]
 
 
+    def get_action(self, *args, **kwargs):
+        return self.sample_action(*args, **kwargs)
+
+
     def best_action_epsilon_greedy(self, l, s, epsilon: float = 0.1):
         if np.random.rand() < epsilon:
             actions = self.gridworld.get_legal_actions(s)
@@ -373,7 +400,7 @@ class Vapor(object):
         return a
 
 
-class SoftQLearning(object):
+class SoftQLearning(Agent):
  
     def __init__(self, gridworld, terminal_states, alpha=0.1, temperature=1.0):
         self.gridworld = gridworld
@@ -423,12 +450,17 @@ class SoftQLearning(object):
         probs /= probs.sum()
         idx = np.random.choice(len(legal_actions), p=probs)
         return legal_actions[idx]
- 
+
+
+    def get_action(self, *args, **kwargs):
+        return self.sample_action(*args, **kwargs)
+
+
     def learn_from_episode(self):
         episode = self.gridworld.get_episode()
         for (s, a, s_next, r) in episode:
             if tuple(s_next) in [tuple(self.gridworld.treasure_pos), tuple(self.gridworld.small_treasure_pos)]:
-                target = r  # Eq. 13: stato terminale, nessun bootstrap
+                target = r # Eq. 13: stato terminale, nessun bootstrap
             else:
                 target = r + self.gamma * self.soft_value(s_next)  # Eq. 15
             qs = (a2idx(s), a2idx(a))
