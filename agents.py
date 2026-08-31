@@ -336,6 +336,9 @@ class Vapor(Agent):
         except Exception as e:
             print(e)
 
+        if x.value is None:
+            raise ValueError
+
         self.curr_lambda = x.value
 
 
