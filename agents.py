@@ -16,12 +16,22 @@ class Agent(object):
         """Initialization of the agent"""
         raise NotImplementedError
 
+    def init_table(self, *args, **kwargs):
+        """
+        Initalizes from scratch all of the state 
+        and learning parameters of the model in question.
+        """
+        raise NotImplementedError
+
     def learn_from_episode(self, *args, **kwargs):
         """For learning from an episode"""
         raise NotImplementedError
 
     def get_action(self, *args, **kwargs):
-        """Preferred way for the model to generate an action in the enviroment during training"""
+        """
+        Preferred way for the model to generate an 
+        action in the enviroment during training
+        """
         raise NotImplementedError
 
     def best_action(self, *args, **kwargs):
@@ -188,7 +198,7 @@ class Vapor(Agent):
         self.legal_states = []
         
 
-        self._init_table()  # Initializes the tables
+        self.init_table()  # Initializes the tables
         #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
         # Initialize enviroment priors
@@ -197,7 +207,7 @@ class Vapor(Agent):
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
 
-    def _init_table(self, repbuffer_size:int=3):
+    def init_table(self, repbuffer_size:int=3):
         """
         Initializes:
             - List of available legal position in the enviroment
@@ -410,9 +420,9 @@ class SoftQLearning(Agent):
         self.temperature = temperature  # unica temperatura, Eq. 15 e 16
         self.terminal_states = terminal_states
         self.table = {}
-        self.__init_table()
+        self.init_table()
  
-    def __init_table(self):
+    def init_table(self):
         table = {}
         for i in range(self.gridworld_size):
             for j in range(self.gridworld_size):
