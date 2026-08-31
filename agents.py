@@ -68,9 +68,9 @@ class QLearning(Agent):
         self.terminal_states = terminal_states
 
         self.table = {}
-        self.__init_table()
+        self.init_table()
 
-    def __init_table(self):
+    def init_table(self):
         table = {}
         for i in range(self.gridworld_size):
             for j in range(self.gridworld_size):
