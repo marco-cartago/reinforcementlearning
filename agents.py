@@ -68,12 +68,13 @@ class RepBuffer(object):
 
 class QLearning(Agent):
 
-    def __init__(self, gridworld: GridWorld, terminal_states, alpha=0.01):
+    def __init__(self, gridworld: GridWorld, terminal_states, alpha=0.01, epsilon=0.2):
         self.gridworld = gridworld
         self.gridworld_size = self.gridworld.size
         self.n_action = 4
         self.alpha = alpha
         self.gamma = gridworld.gamma  # Use the same gamma as the environment
+        self.epsilon = epsilon
 
         self.terminal_states = terminal_states
 
