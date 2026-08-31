@@ -1,117 +1,210 @@
 import time
-
 import numpy as np
-
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from typing import List, Callable, Type
 
 from agents import Agent, QLearning, SoftQLearning, Vapor
 from enviroment import GridWorld
 from utils import GridWorldConfig
 
+# Simulation functions
 
-def num_episode_statistics(
-        config: GridWorldConfig, 
-        max_steps_per_episode: int,
-        episode_step: int,
-        max_episodes: int, 
-        n_simulation: int
-    ):
 
-    # Initialize the environment
-    gridworld = GridWorld(config)
-    terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
-
-    # Initialize the agent
-    q_agent = QLearning(gridworld, terminal_states, alpha=1)
-    show_final_path = True
-
-    episode_rewards = np.zeros(shape=(max_episodes // episode_step, n_simulation)) 
-
-    for n_episodes in range(0, max_episodes, episode_step):
-        for sim in range(n_simulation):
-
-            q_agent.init_table() # Resets what the agent has learned
-            final_reward = 0
-
-            for episode in tqdm(range(n_episodes)):
-                # Reset environment
-                gridworld = GridWorld(config)
-                gridworld.reset()
-                steps = 0
-                total_reward = 0
-                q_agent.gridworld = gridworld
-                q_agent.alpha = 0.1 * (1 - episode / n_episodes)  # Decaying learning rate
-
-                # Run episode
-                while (not gridworld.is_terminated) and (steps < max_steps_per_episode):
-                    s = gridworld.agent_pos
-                    a = q_agent.best_action_epsilon_greedy(s, epsilon=0.5)
-                    reward = gridworld.do_action(a)
-                    total_reward += reward
-                    steps += 1
-
-                # Learn
-                q_agent.learn_from_episode()
-
-                # Store episode reward
-                final_reward = total_reward
-
-            episode_rewards[n_episodes//episode_step, sim] = final_reward
-
-    return episode_rewards
-
-def save_average_plot(data, filename="plot.png", xlabel="Time", ylabel="Value", title="Average with Variance Bound"):
+def run_single_simulation(
+    agent_class: Type[Agent],
+    agent_config: dict,
+    grid_config: GridWorldConfig,
+    max_episodes: int,
+    max_steps: int,
+    decay_alpha: bool = False
+) -> np.ndarray:
     """
-    Plots the average of multiple series with a shaded area representing the variance.
+    Runs a single simulation for an agent and returns the reward history.
     """
-    data = np.asarray(data)
+    agent = agent_class(**agent_config)
+    agent.init_table()
+    
+    rewards = np.zeros(max_episodes)
+    
+    for episode in range(max_episodes):
+        gridworld = GridWorld(grid_config)
+        gridworld.reset()
+        agent.gridworld = gridworld
+        
+        # Handle learning rate decay internally if requested
+        if decay_alpha and hasattr(agent, 'alpha'):
+            agent.alpha = agent_config.get('alpha', 0.1) * (1 - episode / max_episodes)
+
+        steps = 0
+        total_reward = 0
+        while (not gridworld.is_terminated) and (steps < max_steps):
+            s = gridworld.agent_pos
+            a = agent.get_action(s)
+            total_reward += gridworld.do_action(a)
+            steps += 1
+        
+        agent.learn_from_episode()
+        rewards[episode] = total_reward
+        
+    return rewards
+
+
+def run_experiment(
+    agent_class: Type[Agent],
+    agent_config: dict,
+    grid_config: GridWorldConfig,
+    max_episodes: int,
+    max_steps: int,
+    n_simulations: int = 5,
+    decay_alpha: bool = False
+) -> np.ndarray:
+    """
+    Runs multiple simulations and returns a matrix of shape (n_simulations, max_episodes).
+    """
+    results = np.zeros((n_simulations, max_episodes))
+    for sim in range(n_simulations):
+        results[sim, :] = run_single_simulation(
+            agent_class, agent_config, grid_config, max_episodes, max_steps, decay_alpha
+        )
+    return results
+
+# Plotting Functions
+
+
+def plot_learning_curve(data: np.ndarray, filename: str, title: str):
+    """
+    Reward per episode as the agent learns (Fixed Dim, Fixed Episodes).
+    data shape: (n_simulations, episodes)
+    """
     mean = np.mean(data, axis=0)
-    variance = np.var(data, axis=0)
-    std_dev = np.sqrt(variance)
+    std = np.std(data, axis=0)
     x = np.arange(len(mean))
-    
+
     plt.figure(figsize=(10, 6))
-    
-    # Plot the mean
-    plt.plot(x, mean, color='blue', label='Mean', linewidth=2)
-    
-    # Fill the area
-    plt.fill_between(x, mean - std_dev, mean + std_dev, color='blue', alpha=0.2, label='Standard deviation')
-    
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    plt.plot(x, mean, color='blue', label='Mean Reward')
+    plt.fill_between(x, mean - std, mean + std, color='blue', alpha=0.2, label='Std Dev')
+    plt.xlabel("Episode")
+    plt.ylabel("Reward")
     plt.title(title)
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
-    
     plt.savefig(filename)
     plt.close()
 
-if __name__ == "__main__":
 
-    SIZE = 10
-    CONFIG: GridWorldConfig = GridWorldConfig(
-        size=SIZE,
-        p_walls=0.70,
+def plot_reward_vs_dimension(dims: List[int], results: List[np.ndarray], filename: str):
+    """
+    Reward against maze dimension (Fixed Episodes).
+    results: List of reward arrays (one per dimension), 
+    where each array contains final rewards of n_sims.
+    """
+    means = [np.mean(res) for res in results]
+    stds = [np.std(res) for res in results]
+
+    plt.figure(figsize=(10, 6))
+    plt.errorbar(dims, means, yerr=stds, fmt='-o', color='green', capsize=5)
+    plt.xlabel("Maze Dimension")
+    plt.ylabel("Final Episode Reward")
+    plt.title("Performance vs Maze Scale")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.savefig(filename)
+    plt.close()
+
+
+def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray], filename: str):
+    """
+    Reward against total training episodes (Fixed Dim).
+    results: List of reward arrays (one per episode count), 
+    containing final rewards of n_sims.
+    """
+    means = [np.mean(res) for res in results]
+    stds = [np.std(res) for res in results]
+
+    plt.figure(figsize=(10, 6))
+    plt.errorbar(episode_counts, means, yerr=stds, fmt='-o', color='red', capsize=5)
+    plt.xlabel("Training Episodes")
+    plt.ylabel("Final Episode Reward")
+    plt.title("Learning Convergence")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.savefig(filename)
+    plt.close()
+
+
+if __name__ == "__main__":
+    # Base Configurations
+    BASE_SIZE = 8
+    MAX_EPISODES = 10_000
+    DEFAULT_CONFIG = GridWorldConfig(
+        size=BASE_SIZE, 
+        p_walls=0.70, 
         agent_start=np.array((0, 0)),
-        step_penalty=-(2 ** (-10)),
-        small_treasure_rew=1e-3,
+        step_penalty=-(2**-10), 
+        small_treasure_rew=1e-3, 
         treasure_rew=1,
-        sd_small_treasure=1e-3,
-        sd_treasure=1e-3,
+        sd_small_treasure=1e-3, 
+        sd_treasure=1e-3, 
         temperature=0.0,
-        gamma=0.995,
+        gamma=0.995, 
         random_state=4
     )
-    MAX_STEPS_PER_EPISODE = int(3 * SIZE)
-    N_EPISODES = 100
 
-    er = num_episode_statistics(
-        CONFIG, 
-        MAX_STEPS_PER_EPISODE, 
-        episode_step=100, 
-        max_episodes=10_000, 
-        n_simulation=20
+    
+    # Fresh config
+    temp_grid = GridWorld(DEFAULT_CONFIG)
+    q_config = {
+        "gridworld": temp_grid, 
+        "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
+        "alpha": 1e-1, "epsilon": 0.2
+    }
+
+
+    # Reward vs Dimension 
+    dimensions = [4, 8, 12, 16]
+    dim_results = []
+    print("Running Dimension Experiment...")
+    for d in tqdm(dimensions):
+        cfg = DEFAULT_CONFIG
+        cfg.size = d # Update dimension
+        # Run experiment and take the reward of the last episode across n_sims
+        res = run_experiment(
+            QLearning, 
+            q_config, 
+            cfg, 
+            max_episodes=MAX_EPISODES, 
+            max_steps=d*3, 
+            n_simulations=5
+        )
+        dim_results.append(res[:, -1]) 
+    plot_reward_vs_dimension(dimensions, dim_results, f"./figures/dim_study_{time.time_ns()}.png")
+
+
+    # Reward vs Episode Number 
+    ep_counts = [10, 50, 100, 500, 1000, 2000, 2500, 5000]
+    ep_results = []
+    print("Running Episode Count Experiment...")
+    for e in tqdm(ep_counts):
+        res = run_experiment(
+            QLearning, 
+            q_config, 
+            DEFAULT_CONFIG, 
+            max_episodes=e, 
+            max_steps=BASE_SIZE*3, 
+            n_simulations=5
+        )
+        ep_results.append(res[:, -1])
+    plot_reward_vs_episodes(ep_counts, ep_results, f"./figures/ep_study_{time.time_ns()}.png")
+
+
+    # Learning Curve (Single Agent Journey) 
+    print("Running Learning Curve Simulation...")
+    learning_data = run_experiment(
+        QLearning, 
+        q_config, 
+        DEFAULT_CONFIG, 
+        max_episodes=MAX_EPISODES, 
+        max_steps=BASE_SIZE*3, 
+        n_simulations=5, 
+        decay_alpha=True
     )
-    save_average_plot(er, filename=f"./figures/qlearning_plot_{time.time_ns()}")
+    plot_learning_curve(learning_data, f"./figures/learning_curve_{time.time_ns()}.png", "QLearning Convergence over 1000 Episodes")
