@@ -8,6 +8,8 @@ from agents import Agent, QLearning, SoftQLearning, Vapor
 from enviroment import GridWorld
 from utils import GridWorldConfig
 
+from copy import deepcopy
+
 # Simulation functions
 
 
@@ -26,6 +28,9 @@ def run_single_simulation(
     agent.init_table()
     
     rewards = np.zeros(max_episodes)
+
+    temp_start = agent.temperature
+    temp_end = 1e-4
     
     for episode in range(max_episodes):
         gridworld = GridWorld(grid_config)
@@ -35,6 +40,8 @@ def run_single_simulation(
         # Handle learning rate decay internally if requested
         if decay_alpha and hasattr(agent, 'alpha'):
             agent.alpha = agent_config.get('alpha', 0.1) * (1 - episode / max_episodes)
+
+        agent.temperature = temp_start * (temp_end / temp_start) ** (episode/max_episodes)
 
         steps = 0
         total_reward = 0
@@ -134,7 +141,7 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 if __name__ == "__main__":
     # Base Configurations
     BASE_SIZE = 8
-    MAX_EPISODES = 20_000
+    MAX_EPISODES = 10_000
     DEFAULT_CONFIG = GridWorldConfig(
         size=BASE_SIZE, 
         p_walls=0.70, 
@@ -152,31 +159,31 @@ if __name__ == "__main__":
     
     # Fresh config
     temp_grid = GridWorld(DEFAULT_CONFIG)
-    q_config = {
+    soft_q_config = {
         "gridworld": temp_grid, 
         "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
-        "alpha": 1e-1, "epsilon": 0.2
+        "alpha": 1e-1, "temperature": 5e-3
     }
 
 
     # Reward vs Dimension 
-    dimensions = [x for x in range(0, 17, 2)]
+    dimensions = [4, 8, 12, 16]
     dim_results = []
     print("Running Dimension Experiment...")
     for d in tqdm(dimensions):
-        cfg = DEFAULT_CONFIG
+        cfg = deepcopy(DEFAULT_CONFIG)
         cfg.size = d # Update dimension
         # Run experiment and take the reward of the last episode across n_sims
         res = run_experiment(
-            QLearning, 
-            q_config, 
+            SoftQLearning, 
+            soft_q_config, 
             cfg, 
             max_episodes=MAX_EPISODES, 
             max_steps=d*3, 
             n_simulations=5
         )
         dim_results.append(res[:, -1]) 
-    plot_reward_vs_dimension(dimensions, dim_results, f"./figures/dim_study_{time.time_ns()}.png", )
+    plot_reward_vs_dimension(dimensions, dim_results, f"./figures/dim_study_{time.time_ns()}.png")
 
 
     # Reward vs Episode Number 
@@ -185,8 +192,8 @@ if __name__ == "__main__":
     print("Running Episode Count Experiment...")
     for e in tqdm(ep_counts):
         res = run_experiment(
-            QLearning, 
-            q_config, 
+            SoftQLearning, 
+            soft_q_config, 
             DEFAULT_CONFIG, 
             max_episodes=e, 
             max_steps=BASE_SIZE*3, 
@@ -199,16 +206,12 @@ if __name__ == "__main__":
     # Learning Curve (Single Agent Journey) 
     print("Running Learning Curve Simulation...")
     learning_data = run_experiment(
-        QLearning, 
-        q_config, 
+        SoftQLearning, 
+        soft_q_config, 
         DEFAULT_CONFIG, 
         max_episodes=MAX_EPISODES, 
         max_steps=BASE_SIZE*3, 
         n_simulations=5, 
         decay_alpha=True
     )
-    plot_learning_curve(learning_data, f"./figures/learning_curve_{time.time_ns()}.png", "QLearning Convergence over 1000 Episodes")
-
-# TODO
-# - Fix the scale of eack plot to be the same
-# - Add to the titles the specifics of each plot
+    plot_learning_curve(learning_data, f"./figures/learning_curve_{time.time_ns()}.png", "SoftQLearning Convergence over 1000 Episodes")
