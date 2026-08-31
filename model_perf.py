@@ -134,7 +134,7 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 if __name__ == "__main__":
     # Base Configurations
     BASE_SIZE = 8
-    MAX_EPISODES = 10_000
+    MAX_EPISODES = 20_000
     DEFAULT_CONFIG = GridWorldConfig(
         size=BASE_SIZE, 
         p_walls=0.70, 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
 
     # Reward vs Dimension 
-    dimensions = [4, 8, 12, 16]
+    dimensions = [x for x in range(0, 17, 2)]
     dim_results = []
     print("Running Dimension Experiment...")
     for d in tqdm(dimensions):
@@ -176,7 +176,7 @@ if __name__ == "__main__":
             n_simulations=5
         )
         dim_results.append(res[:, -1]) 
-    plot_reward_vs_dimension(dimensions, dim_results, f"./figures/dim_study_{time.time_ns()}.png")
+    plot_reward_vs_dimension(dimensions, dim_results, f"./figures/dim_study_{time.time_ns()}.png", )
 
 
     # Reward vs Episode Number 
@@ -208,3 +208,7 @@ if __name__ == "__main__":
         decay_alpha=True
     )
     plot_learning_curve(learning_data, f"./figures/learning_curve_{time.time_ns()}.png", "QLearning Convergence over 1000 Episodes")
+
+# TODO
+# - Fix the scale of eack plot to be the same
+# - Add to the titles the specifics of each plot
