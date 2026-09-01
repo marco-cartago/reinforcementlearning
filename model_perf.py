@@ -29,9 +29,10 @@ def run_single_simulation(
     
     rewards = np.zeros(max_episodes)
 
-    temp_start = agent.temperature
-    temp_end = 1e-4
-    
+    if hasattr(agent, "temperature"):
+        temp_start = agent.temperature
+        temp_end = 1e-4
+        
     for episode in range(max_episodes):
         gridworld = GridWorld(grid_config)
         gridworld.reset()
@@ -41,7 +42,8 @@ def run_single_simulation(
         if decay_alpha and hasattr(agent, 'alpha'):
             agent.alpha = agent_config.get('alpha', 0.1) * (1 - episode / max_episodes)
 
-        agent.temperature = temp_start * (temp_end / temp_start) ** (episode/max_episodes)
+        if hasattr(agent, "temperature"):
+            agent.temperature = temp_start * (temp_end / temp_start) ** (episode/max_episodes)
 
         steps = 0
         total_reward = 0
@@ -159,6 +161,7 @@ if __name__ == "__main__":
     # Fresh config
     temp_grid = GridWorld(DEFAULT_CONFIG)
 
+    # Agents configs ------------------------------------------------------------------------------
     q_config = {
         "gridworld": temp_grid, 
         "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
@@ -181,17 +184,18 @@ if __name__ == "__main__":
         "repbuffer_size": 4
     }
 
-    # {model_name: (model's class, model's class config)}
+    # {model_class: (model's class, model's class config)}
     models_dict = {
         "Q-learning": (QLearning, q_config),
         "Soft-Q-Learning": (SoftQLearning, soft_q_config),
         "VAPOR": (Vapor, vapor_config)
     }
 
-    MODEL = "Soft-Q-Learning"
+    model_name = "Soft-Q-Learning"
+    model_class, model_config = models_dict[model_name]
 
-    # Reward vs Dimension 
-    dimensions = [4, 8, 12, 16]
+    # Reward vs Dimension -------------------------------------------------------------------------
+    dimensions = [dim for dim in range(2, 16, 2)]
     dim_results = []
     print("Running Dimension Experiment...")
     for d in tqdm(dimensions):
@@ -199,8 +203,8 @@ if __name__ == "__main__":
         cfg.size = d # Update dimension
         # Run experiment and take the reward of the last episode across n_sims
         res = run_experiment(
-            models_dict[MODEL][0], 
-            models_dict[MODEL][1], 
+            model_class, 
+            model_config, 
             cfg, 
             max_episodes=MAX_EPISODES, 
             max_steps=d*3, 
@@ -210,35 +214,46 @@ if __name__ == "__main__":
     plot_reward_vs_dimension(
         dimensions, 
         dim_results, 
-        f"./figures/dim_study_{time.time_ns()}.png", MODEL, n_epsiodes=MAX_EPISODES)
+        f"./figures/{model_name}_dim_study_{time.time_ns()}.png", 
+        model_name, 
+        n_epsiodes=MAX_EPISODES
+    )
 
 
-    # Reward vs Episode Number 
-    ep_counts = [10, 50, 100, 500, 1000, 2000, 2500, 5000]
+    # Reward vs Episode Number --------------------------------------------------------------------
+    ep_counts = [10] + [e for e in range(100, 2500 + 100, 100)] + [5000]
     ep_results = []
     print("Running Episode Count Experiment...")
     for e in tqdm(ep_counts):
         res = run_experiment(
-            models_dict[MODEL][0], 
-            models_dict[MODEL][1], 
+            model_class, 
+            model_config, 
             DEFAULT_CONFIG, 
             max_episodes=e, 
             max_steps=BASE_SIZE*3, 
             n_simulations=5
         )
         ep_results.append(res[:, -1])
-    plot_reward_vs_episodes(ep_counts, ep_results, f"./figures/ep_study_{time.time_ns()}.png")
+    plot_reward_vs_episodes(
+        ep_counts, 
+        ep_results, 
+        f"./figures/{model_name}_ep_study_{time.time_ns()}.png"
+    )
 
 
-    # Learning Curve (Single Agent Journey) 
+    # Learning Curve (Single Agent Journey) -------------------------------------------------------
     print("Running Learning Curve Simulation...")
     learning_data = run_experiment(
-        models_dict[MODEL][0], 
-        models_dict[MODEL][1], 
+        model_class, 
+        model_config, 
         DEFAULT_CONFIG, 
         max_episodes=MAX_EPISODES, 
         max_steps=BASE_SIZE*3, 
         n_simulations=5, 
         decay_alpha=True
     )
-    plot_learning_curve(learning_data, f"./figures/learning_curve_{time.time_ns()}.png", "SoftQLearning Convergence over 1000 Episodes")
+    plot_learning_curve(
+        learning_data, 
+        f"./figures/{model_name}_learning_curve_{time.time_ns()}.png", 
+        "SoftQLearning Convergence over 1000 Episodes"
+    )
