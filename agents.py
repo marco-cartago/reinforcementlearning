@@ -169,7 +169,7 @@ class Vapor(Agent):
         self.gridworld_size = self.gridworld.size
         self.gamma = gridworld.gamma
         self.initial_state = a2idx(gridworld.agent_start)
-        self.terminal_states = terminal_states
+        self.terminal_states = [a2idx(s) for s in terminal_states]
         if horizon == -1:
             self.horizon = self.gridworld_size * 2 - 1
         else:
@@ -206,9 +206,6 @@ class Vapor(Agent):
         #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
         # Initialize enviroment priors
-        self.curr_lambda = np.zeros(len(self.legal_qstates))
-        self.curr_reward_mean = np.zeros(len(self.legal_qstates))
-        self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
 
     def init_table(self):
@@ -237,6 +234,11 @@ class Vapor(Agent):
 
         # Initializes buffers for the state rewards
         self.reward_buff = {qs: RepBuffer(size=self.repbuffer_size, seed=i) for i, qs in enumerate(self.legal_qstates)}
+
+        # Set other learning parameters
+        self.curr_lambda = np.zeros(len(self.legal_qstates))
+        self.curr_reward_mean = np.zeros(len(self.legal_qstates))
+        self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
 
     def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-1):
@@ -346,7 +348,8 @@ class Vapor(Agent):
         self.curr_lambda = x.value
 
 
-    def learn_from_episode(self, episode):
+    def learn_from_episode(self):
+        episode = self.gridworld.get_episode()
         lsa_s = [
             (l, a2idx(s), a2idx(a)) 
             for l, (s, a, _, _) in zip(range(len(episode)), episode)
