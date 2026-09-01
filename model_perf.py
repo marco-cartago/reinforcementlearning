@@ -146,8 +146,9 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 if __name__ == "__main__":
     # Base Configurations
     BASE_SIZE = 8
-    MAX_EPISODES = 8_000
-    MAX_STEPS = 50
+    MAX_EPISODES = 50
+    MAX_STEPS = 3 * BASE_SIZE
+
     DEFAULT_CONFIG = GridWorldConfig(
         size=BASE_SIZE, 
         p_walls=0.70, 

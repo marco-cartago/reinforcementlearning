@@ -200,6 +200,9 @@ class Vapor(Agent):
         # Each element is of the form (l, (i,j), a) (timestep, position, action)
         self.legal_qstates = []
         self.legal_states = []
+
+        # Precomputes the builder of the constraints
+        self.constraint_builder = self.get_constraint_applier() 
         
 
         self.init_table()  # Initializes the tables
@@ -317,6 +320,64 @@ class Vapor(Agent):
 
         return constraints
 
+
+    def get_constraint_applier(self):
+        """
+        This is the outer function. It performs the expensive loops once 
+        and returns a 'closure' (the inner function) that applies 
+        these findings to any Variable x passed to it.
+        """
+        indexof = lambda s: self.qstate_to_idx[s]
+        is_initial = lambda s: 1 if s == self.initial_state else 0
+        
+        # We store the "recipe" for the constraints as simple lists/tuples
+        initial_recipe = []
+        for s in self.legal_states:
+            idxs = [indexof((0, s, a2idx(a))) for a in self.gridworld.get_legal_actions(np.array(s))]
+            initial_recipe.append((idxs, is_initial(s)))
+
+        stat_recipe = []
+        for l in range(self.horizon - 1):
+            for sp in self.legal_states:
+                s_a_idxs = []
+                probs = []
+                for s in self.legal_states:
+                    for a in self.gridworld.get_legal_actions(np.array(s)):
+                        p = self.gridworld.get_transition_prob(s, a, sp)
+                        if p == 0: continue
+                        qs = (l, s, a2idx(a))
+                        if qs not in self.qstate_to_idx: continue
+                        s_a_idxs.append(indexof(qs))
+                        probs.append(p)
+
+                sp_idxs = [indexof((l + 1, sp, a2idx(ap))) for ap in self.gridworld.get_legal_actions(sp)]
+                # Store as: (successor_indices, predecessor_indices, probabilities)
+                stat_recipe.append((sp_idxs, s_a_idxs, np.array(probs)))
+
+
+        def apply_constraints(x):
+            """
+            This inner function has access to initial_recipe and stat_recipe
+            even after get_constraint_applier has finished executing.
+            """
+            constraints = []
+            
+            # Apply initial constraints
+            for idxs, val in initial_recipe:
+                constraints.append(cp.sum(x[idxs]) == val)
+            
+            # Apply stationarity constraints
+            for sp_idxs, sa_idxs, probs in stat_recipe:
+                if len(sa_idxs) > 0:
+                    constraints.append(cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[sa_idxs], probs)))
+                else:
+                    constraints.append(cp.sum(x[sp_idxs]) == 0)
+                    
+            return constraints
+
+        return apply_constraints
+
+
     def update_lambda(self, solver: str = "CLARABEL", verbose: bool = False) -> None:
         nv = len(self.legal_qstates) # Number of varaibles
         x = cp.Variable(nv)
@@ -333,7 +394,7 @@ class Vapor(Agent):
             for i in range(nv)
         ]
         pos_constraints = [x >= 0, y >= 0]
-        constraints = y_constr + pos_constraints + self.lambda_stat_constraint(x)
+        constraints = y_constr + pos_constraints + self.constraint_builder(x)
 
         problem = cp.Problem(objective, constraints)
 
