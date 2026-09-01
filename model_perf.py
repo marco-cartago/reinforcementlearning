@@ -25,7 +25,6 @@ def run_single_simulation(
     Runs a single simulation for an agent and returns the reward history.
     """
     agent = agent_class(**agent_config)
-    agent.init_table()
     
     rewards = np.zeros(max_episodes)
 
@@ -49,13 +48,17 @@ def run_single_simulation(
         total_reward = 0
         while (not gridworld.is_terminated) and (steps < max_steps):
             s = gridworld.agent_pos
-            a = agent.get_action(s)
+            if isinstance(agent, Vapor):
+                a = agent.sample_action(steps, s)
+            else:
+                a = agent.get_action(s)
             total_reward += gridworld.do_action(a)
             steps += 1
         
         agent.learn_from_episode()
         rewards[episode] = total_reward
-        
+
+
     return rewards
 
 
@@ -143,7 +146,8 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 if __name__ == "__main__":
     # Base Configurations
     BASE_SIZE = 8
-    MAX_EPISODES = 10_000
+    MAX_EPISODES = 8_000
+    MAX_STEPS = 50
     DEFAULT_CONFIG = GridWorldConfig(
         size=BASE_SIZE, 
         p_walls=0.70, 
@@ -155,7 +159,7 @@ if __name__ == "__main__":
         sd_treasure=1e-3, 
         temperature=0.0,
         gamma=0.995, 
-        random_state=4
+        random_state=1
     )
 
     # Fresh config
@@ -179,7 +183,7 @@ if __name__ == "__main__":
     vapor_config = {
         "gridworld": temp_grid, 
         "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
-        "horizon": MAX_EPISODES,
+        "horizon": MAX_STEPS,
         "sigma_prior": 1.0,
         "repbuffer_size": 4
     }
@@ -191,17 +195,21 @@ if __name__ == "__main__":
         "VAPOR": (Vapor, vapor_config)
     }
 
-    model_name = "Soft-Q-Learning"
+    model_name = "VAPOR"
     model_class, model_config = models_dict[model_name]
 
     # Reward vs Dimension -------------------------------------------------------------------------
-    dimensions = [dim for dim in range(2, 16, 2)]
+    dimensions = [dim for dim in range(4, 16, 2)]
     dim_results = []
     print("Running Dimension Experiment...")
     for d in tqdm(dimensions):
         cfg = deepcopy(DEFAULT_CONFIG)
         cfg.size = d # Update dimension
-        # Run experiment and take the reward of the last episode across n_sims
+
+        if model_name == "VAPOR":
+            vapor_config["gridworld"] = GridWorld(cfg)
+            vapor_config["horizon"] = 3*d
+
         res = run_experiment(
             model_class, 
             model_config, 
@@ -225,6 +233,11 @@ if __name__ == "__main__":
     ep_results = []
     print("Running Episode Count Experiment...")
     for e in tqdm(ep_counts):
+
+        if model_name == "VAPOR":
+            vapor_config["gridworld"] = GridWorld(DEFAULT_CONFIG)
+            vapor_config["horizon"] = 3*MAX_STEPS
+
         res = run_experiment(
             model_class, 
             model_config, 
@@ -234,12 +247,15 @@ if __name__ == "__main__":
             n_simulations=5
         )
         ep_results.append(res[:, -1])
+
     plot_reward_vs_episodes(
         ep_counts, 
         ep_results, 
         f"./figures/{model_name}_ep_study_{time.time_ns()}.png"
     )
 
+
+    model_class, model_config = models_dict[model_name]
 
     # Learning Curve (Single Agent Journey) -------------------------------------------------------
     print("Running Learning Curve Simulation...")
