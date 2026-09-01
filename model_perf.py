@@ -100,7 +100,7 @@ def plot_learning_curve(data: np.ndarray, filename: str, title: str):
     plt.close()
 
 
-def plot_reward_vs_dimension(dims: List[int], results: List[np.ndarray], filename: str):
+def plot_reward_vs_dimension(dims: List[int], results: List[np.ndarray], filename: str, algo: str, n_epsiodes: int = 100):
     """
     Reward against maze dimension (Fixed Episodes).
     results: List of reward arrays (one per dimension), 
@@ -113,7 +113,7 @@ def plot_reward_vs_dimension(dims: List[int], results: List[np.ndarray], filenam
     plt.errorbar(dims, means, yerr=stds, fmt='-o', color='green', capsize=5)
     plt.xlabel("Maze Dimension")
     plt.ylabel("Final Episode Reward")
-    plt.title("Performance vs Maze Scale")
+    plt.title(f"Performance vs Maze Scale - {algo} (fixed n. episodes {n_epsiodes})")
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.savefig(filename)
     plt.close()
@@ -156,15 +156,39 @@ if __name__ == "__main__":
         random_state=4
     )
 
-    
     # Fresh config
     temp_grid = GridWorld(DEFAULT_CONFIG)
+
+    q_config = {
+        "gridworld": temp_grid, 
+        "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
+        "alpha": 1e-1, 
+        "epsilon": 1e-1   
+    }
+
     soft_q_config = {
         "gridworld": temp_grid, 
         "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
-        "alpha": 1e-1, "temperature": 5e-3
+        "alpha": 1e-1, 
+        "temperature": 5e-3
     }
 
+    vapor_config = {
+        "gridworld": temp_grid, 
+        "terminal_states": [temp_grid.treasure_pos, temp_grid.small_treasure_pos], 
+        "horizon": MAX_EPISODES,
+        "sigma_prior": 1.0,
+        "repbuffer_size": 4
+    }
+
+    # {model_name: (model's class, model's class config)}
+    models_dict = {
+        "Q-learning": (QLearning, q_config),
+        "Soft-Q-Learning": (SoftQLearning, soft_q_config),
+        "VAPOR": (Vapor, vapor_config)
+    }
+
+    MODEL = "Soft-Q-Learning"
 
     # Reward vs Dimension 
     dimensions = [4, 8, 12, 16]
@@ -175,15 +199,18 @@ if __name__ == "__main__":
         cfg.size = d # Update dimension
         # Run experiment and take the reward of the last episode across n_sims
         res = run_experiment(
-            SoftQLearning, 
-            soft_q_config, 
+            models_dict[MODEL][0], 
+            models_dict[MODEL][1], 
             cfg, 
             max_episodes=MAX_EPISODES, 
             max_steps=d*3, 
             n_simulations=5
         )
         dim_results.append(res[:, -1]) 
-    plot_reward_vs_dimension(dimensions, dim_results, f"./figures/dim_study_{time.time_ns()}.png")
+    plot_reward_vs_dimension(
+        dimensions, 
+        dim_results, 
+        f"./figures/dim_study_{time.time_ns()}.png", MODEL, n_epsiodes=MAX_EPISODES)
 
 
     # Reward vs Episode Number 
@@ -192,8 +219,8 @@ if __name__ == "__main__":
     print("Running Episode Count Experiment...")
     for e in tqdm(ep_counts):
         res = run_experiment(
-            SoftQLearning, 
-            soft_q_config, 
+            models_dict[MODEL][0], 
+            models_dict[MODEL][1], 
             DEFAULT_CONFIG, 
             max_episodes=e, 
             max_steps=BASE_SIZE*3, 
@@ -206,8 +233,8 @@ if __name__ == "__main__":
     # Learning Curve (Single Agent Journey) 
     print("Running Learning Curve Simulation...")
     learning_data = run_experiment(
-        SoftQLearning, 
-        soft_q_config, 
+        models_dict[MODEL][0], 
+        models_dict[MODEL][1], 
         DEFAULT_CONFIG, 
         max_episodes=MAX_EPISODES, 
         max_steps=BASE_SIZE*3, 

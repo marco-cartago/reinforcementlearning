@@ -162,6 +162,7 @@ class Vapor(Agent):
         terminal_states,
         horizon: int = -1,
         sigma_prior: float = 1.0,
+        repbuffer_size: int = 4
     ):
         # Gridworld structure
         self.gridworld = gridworld
@@ -173,6 +174,8 @@ class Vapor(Agent):
             self.horizon = self.gridworld_size * 2 - 1
         else:
             self.horizon = horizon
+
+        self.repbuffer_size = repbuffer_size
 
         # Prior paremeters
         self.sigma_prior = sigma_prior
@@ -208,7 +211,7 @@ class Vapor(Agent):
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
 
-    def init_table(self, repbuffer_size:int=3):
+    def init_table(self):
         """
         Initializes:
             - List of available legal position in the enviroment
@@ -233,7 +236,7 @@ class Vapor(Agent):
         self.qstate_to_idx = {key: idx for idx, key in enumerate(self.legal_qstates)}
 
         # Initializes buffers for the state rewards
-        self.reward_buff = {qs: RepBuffer(size=repbuffer_size, seed=i) for i, qs in enumerate(self.legal_qstates)}
+        self.reward_buff = {qs: RepBuffer(size=self.repbuffer_size, seed=i) for i, qs in enumerate(self.legal_qstates)}
 
 
     def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-1):
