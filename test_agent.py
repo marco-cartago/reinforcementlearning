@@ -142,8 +142,7 @@ def main_VAPOR():
                 time.sleep(0.1)
 
         # Learn and store episode reward
-        episode = gridworld.get_episode()
-        VAPOR_agent.learn_from_episode(episode)
+        VAPOR_agent.learn_from_episode()
 
         episode_rewards.append(total_reward)
 
@@ -294,5 +293,5 @@ if __name__ == "__main__":
     clear_screen()
     # main_QLEARNING()
     clear_screen()
-    # main_VAPOR()
-    main_SoftQLEARNING()
+    main_VAPOR()
+    # main_SoftQLEARNING()
