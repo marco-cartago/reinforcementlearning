@@ -336,12 +336,10 @@ class Vapor(Agent):
             self._objective = cp.Maximize(cp.sum(cp.multiply(self._x, self._r) + self._y))
             self._t = cp.Variable(self._nv, nonneg=True)
 
-            # Vincolo di entropia, vettorizzato in UN atomo (cp.entr accetta vettori nativamente)
             entropy_constr = [self._t <= 2 * cp.multiply(self._s, cp.entr(self._x))]
 
-            # quad_over_lin(y_i, x_i) <= t_i per ogni i, come UN solo vincolo SOC vettorizzato
-            X = cp.vstack([2 * self._y, self._x - self._t])          # shape (2, nv)
-            soc_constr = [cp.SOC(self._x + self._t, X, axis=0)]        # norm per colonna <= x_i + t_i
+            X = cp.vstack([2 * self._y, self._x - self._t])
+            soc_constr = [cp.SOC(self._x + self._t, X, axis=0)]      
 
             pos_constraints = [self._x >= 0, self._y >= 0]
             self._constraints = soc_constr + entropy_constr + pos_constraints + self.lambda_stat_constraint(self._x)

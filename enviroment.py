@@ -209,7 +209,11 @@ class GridWorld(object):
                 idx = random.randint(0, len(filtered_actions))
                 move = available_actions[idx]
 
-        reward = self.step_penalty
+        step_penalty = 0
+        t_reward = 0
+        if np.array_equal(move, self.RIGHT):
+            step_penalty = self.step_penalty / self.size
+
         start_agent_pos = self.agent_pos.copy()
         end_agent_pos = self.agent_pos + move
 
@@ -220,14 +224,18 @@ class GridWorld(object):
 
         if self.grid[a2idx(self.agent_pos)].item() == self.TREASURE:
             self.is_terminated = True
-            reward = self.treasure_rew + np.random.normal() * self.sd_treasure
-            self.total_reward += reward
+            t_reward = self.treasure_rew + np.random.normal() * self.sd_treasure
+            t_reward = np.clip(t_reward, a_min=0.0, a_max=1.0)
+            self.total_reward += t_reward
         
         
         if self.grid[a2idx(self.agent_pos)].item() == self.SMALL_TREASURE:
             self.is_terminated = True
-            reward = self.small_treasure_rew + np.random.normal() * self.sd_small_treasure
-            self.total_reward += reward
+            t_reward = self.small_treasure_rew + np.random.normal() * self.sd_small_treasure
+            t_reward = np.clip(t_reward, a_min=0.0, a_max=1.0)
+            self.total_reward += t_reward
+
+        reward = t_reward + step_penalty
 
         sasr = (start_agent_pos, move, end_agent_pos, reward)
         self.current_episode.append(sasr)

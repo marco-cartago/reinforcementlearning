@@ -153,7 +153,7 @@ if __name__ == "__main__":
         size=BASE_SIZE, 
         p_walls=0.70, 
         agent_start=np.array((0, 0)),
-        step_penalty=-(2**-10), 
+        step_penalty=-(1e-3), 
         small_treasure_rew=1e-3, 
         treasure_rew=1,
         sd_small_treasure=1e-3, 
@@ -200,23 +200,24 @@ if __name__ == "__main__":
     model_class, model_config = models_dict[model_name]
 
     # Reward vs Dimension -------------------------------------------------------------------------
-    dimensions = [dim for dim in range(4, 16, 2)]
+    dimensions = [4, 6]#[dim for dim in range(4, 16, 2)]
     dim_results = []
     print("Running Dimension Experiment...")
     for d in tqdm(dimensions):
         cfg = deepcopy(DEFAULT_CONFIG)
         cfg.size = d # Update dimension
+        max_steps = 2*d
 
         if model_name == "VAPOR":
             vapor_config["gridworld"] = GridWorld(cfg)
-            vapor_config["horizon"] = 3*d
+            vapor_config["horizon"] = max_steps
 
         res = run_experiment(
             model_class, 
             model_config, 
             cfg, 
             max_episodes=MAX_EPISODES, 
-            max_steps=d*3, 
+            max_steps=max_steps, 
             n_simulations=5
         )
         dim_results.append(res[:, -1]) 
@@ -230,21 +231,21 @@ if __name__ == "__main__":
 
 
     # Reward vs Episode Number --------------------------------------------------------------------
-    ep_counts = [10] + [e for e in range(100, 2500 + 100, 100)] + [5000]
+    ep_counts = [5, 20, 40, 80, 100]#[10] + [e for e in range(100, 2500 + 100, 100)] + [5000]
     ep_results = []
     print("Running Episode Count Experiment...")
     for e in tqdm(ep_counts):
 
         if model_name == "VAPOR":
             vapor_config["gridworld"] = GridWorld(DEFAULT_CONFIG)
-            vapor_config["horizon"] = 3*MAX_STEPS
+            vapor_config["horizon"] = e
 
         res = run_experiment(
             model_class, 
             model_config, 
             DEFAULT_CONFIG, 
             max_episodes=e, 
-            max_steps=BASE_SIZE*3, 
+            max_steps=e, 
             n_simulations=5
         )
         ep_results.append(res[:, -1])
@@ -265,7 +266,7 @@ if __name__ == "__main__":
         model_config, 
         DEFAULT_CONFIG, 
         max_episodes=MAX_EPISODES, 
-        max_steps=BASE_SIZE*3, 
+        max_steps=MAX_STEPS, 
         n_simulations=5, 
         decay_alpha=True
     )
