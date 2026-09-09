@@ -200,16 +200,12 @@ class Vapor(Agent):
         # Each element is of the form (l, (i,j), a) (timestep, position, action)
         self.legal_qstates = []
         self.legal_states = []
-
-        # Precomputes the builder of the constraints
-        self.constraint_builder = self.get_constraint_applier() 
         
 
         self.init_table()  # Initializes the tables
         #print(f"[DEBUG] Found {len(self.legal_qstates)} q-states")
 
-        # Initialize enviroment priors
-
+        self._problem_is_initialized = False
 
     def init_table(self):
         """
@@ -243,6 +239,8 @@ class Vapor(Agent):
         self.curr_reward_mean = np.zeros(len(self.legal_qstates))
         self.curr_reward_variance = np.zeros(len(self.legal_qstates)) + self.sigma_prior
 
+        # I have to build the first time the constaints in the optimizer
+        self._problem_is_initialized = False
 
     def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-1):
         """
@@ -251,6 +249,10 @@ class Vapor(Agent):
          1. Estimates mean and reward variance using the `RepBuffer` for that particular q-state
          2. Locally modifies via byesian update `self.curr_reward_variance` and `self.curr_reward_mean` using the estimates
         """
+
+        # Update the buffers of collected rewards
+        for qs, r in zip(lsa_s, r_s):
+            self.reward_buff[qs].add(r)
 
         mu = self.curr_reward_mean
         s = self.curr_reward_variance
@@ -320,93 +322,44 @@ class Vapor(Agent):
 
         return constraints
 
-
-    def get_constraint_applier(self):
-        """
-        This is the outer function. It performs the expensive loops once 
-        and returns a 'closure' (the inner function) that applies 
-        these findings to any Variable x passed to it.
-        """
-        indexof = lambda s: self.qstate_to_idx[s]
-        is_initial = lambda s: 1 if s == self.initial_state else 0
-        
-        # We store the "recipe" for the constraints as simple lists/tuples
-        initial_recipe = []
-        for s in self.legal_states:
-            idxs = [indexof((0, s, a2idx(a))) for a in self.gridworld.get_legal_actions(np.array(s))]
-            initial_recipe.append((idxs, is_initial(s)))
-
-        stat_recipe = []
-        for l in range(self.horizon - 1):
-            for sp in self.legal_states:
-                s_a_idxs = []
-                probs = []
-                for s in self.legal_states:
-                    for a in self.gridworld.get_legal_actions(np.array(s)):
-                        p = self.gridworld.get_transition_prob(s, a, sp)
-                        if p == 0: continue
-                        qs = (l, s, a2idx(a))
-                        if qs not in self.qstate_to_idx: continue
-                        s_a_idxs.append(indexof(qs))
-                        probs.append(p)
-
-                sp_idxs = [indexof((l + 1, sp, a2idx(ap))) for ap in self.gridworld.get_legal_actions(sp)]
-                # Store as: (successor_indices, predecessor_indices, probabilities)
-                stat_recipe.append((sp_idxs, s_a_idxs, np.array(probs)))
-
-
-        def apply_constraints(x):
-            """
-            This inner function has access to initial_recipe and stat_recipe
-            even after get_constraint_applier has finished executing.
-            """
-            constraints = []
-            
-            # Apply initial constraints
-            for idxs, val in initial_recipe:
-                constraints.append(cp.sum(x[idxs]) == val)
-            
-            # Apply stationarity constraints
-            for sp_idxs, sa_idxs, probs in stat_recipe:
-                if len(sa_idxs) > 0:
-                    constraints.append(cp.sum(x[sp_idxs]) == cp.sum(cp.multiply(x[sa_idxs], probs)))
-                else:
-                    constraints.append(cp.sum(x[sp_idxs]) == 0)
-                    
-            return constraints
-
-        return apply_constraints
-
-
     def update_lambda(self, solver: str = "CLARABEL", verbose: bool = False) -> None:
-        nv = len(self.legal_qstates) # Number of varaibles
-        x = cp.Variable(nv)
-        y = cp.Variable(nv) # Auxiluiary variables
-        r = self.curr_reward_mean
-        s = self.curr_reward_variance
 
-        # Modified objective
-        objective = cp.Maximize(cp.sum(cp.multiply(x, r) + y))
+        if not self._problem_is_initialized:
+            self._nv = len(self.legal_qstates) # Number of varaibles
+            self._x = cp.Variable(self._nv)
+            self._y = cp.Variable(self._nv) # Auxiluiary variables
+            self._r = cp.Parameter(self._nv)
+            self._s = cp.Parameter(self._nv, nonneg=True)
+            self._r.value = self.curr_reward_mean
+            self._s.value = self.curr_reward_variance
+
+            self._objective = cp.Maximize(cp.sum(cp.multiply(self._x, self._r) + self._y))
+            self._t = cp.Variable(self._nv, nonneg=True)
+
+            # Vincolo di entropia, vettorizzato in UN atomo (cp.entr accetta vettori nativamente)
+            entropy_constr = [self._t <= 2 * cp.multiply(self._s, cp.entr(self._x))]
+
+            # quad_over_lin(y_i, x_i) <= t_i per ogni i, come UN solo vincolo SOC vettorizzato
+            X = cp.vstack([2 * self._y, self._x - self._t])          # shape (2, nv)
+            soc_constr = [cp.SOC(self._x + self._t, X, axis=0)]        # norm per colonna <= x_i + t_i
+
+            pos_constraints = [self._x >= 0, self._y >= 0]
+            self._constraints = soc_constr + entropy_constr + pos_constraints + self.lambda_stat_constraint(self._x)
         
-        # Additionlal axuiliary variable constrints
-        y_constr = [
-            cp.quad_over_lin(y[i], x[i]) <= 2 * (s[i]) * cp.entr(x[i]) 
-            for i in range(nv)
-        ]
-        pos_constraints = [x >= 0, y >= 0]
-        constraints = y_constr + pos_constraints + self.constraint_builder(x)
+            self._problem = cp.Problem(self._objective, self._constraints)
+            self._problem_is_initialized = True
 
-        problem = cp.Problem(objective, constraints)
-
+        self._r.value = self.curr_reward_mean
+        self._s.value = self.curr_reward_variance
         try:
-            problem.solve(solver=solver, verbose=verbose)
+            self._problem.solve(solver=solver, verbose=verbose, canon_backend=cp.COO_CANON_BACKEND)
         except Exception as e:
             print(e)
 
-        if x.value is None:
+        if self._x.value is None:
             raise ValueError
 
-        self.curr_lambda = x.value
+        self.curr_lambda = self._x.value
 
 
     def learn_from_episode(self):
@@ -417,10 +370,6 @@ class Vapor(Agent):
         ]
         r_s = [r for (_, _, _, r) in episode]
         #returns = compute_returns_np(r_s, self.gamma)
-
-        # Update the buffer of collected rewards
-        for qs, r in zip(lsa_s, r_s):
-            self.reward_buff[qs].add(r)
 
         self.update_env_model(lsa_s, r_s) # Change the prior on the enviroment
         self.update_lambda() # Update the env lambdas
@@ -469,16 +418,6 @@ class Vapor(Agent):
 
     def get_action(self, *args, **kwargs):
         return self.sample_action(*args, **kwargs)
-
-
-    def best_action_epsilon_greedy(self, l, s, epsilon: float = 0.1):
-        if np.random.rand() < epsilon:
-            actions = self.gridworld.get_legal_actions(s)
-            a_idx = np.random.randint(0, len(actions))
-            a = actions[a_idx]
-        else:
-            a = self.best_action(l, s)
-        return a
 
 
 class SoftQLearning(Agent):
