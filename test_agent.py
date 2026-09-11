@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 import pygame
 
-BASE_SIZE = 5
+BASE_SIZE = 6
 N_EPISODES = 50
 MAX_STEPS_PER_EPISODE = 2 * (BASE_SIZE + 1)
 
@@ -30,18 +30,18 @@ CONFIG = GridWorldConfig(
     random_state=1
 )
 
-def gui(gridworld, agent):
+def gui(gridworld, agent, size_gui = 320):
     print("\n=== Final Learned Path ===")
     
     # Reset environment for final demonstration
     gridworld = GridWorld(CONFIG)
     gridworld.reset()
     
-    size_image = 320 / (gridworld.size + 2)
+    size_image = size_gui / (gridworld.size + 2)
 
     pygame.init()
     pygame.display.set_caption("=== Final Learned Path ===")
-    screen = pygame.display.set_mode((320, 320))
+    screen = pygame.display.set_mode((size_gui, size_gui))
     clock = pygame.time.Clock()
     walls = []
     
@@ -52,14 +52,14 @@ def gui(gridworld, agent):
     
     for i in range(gridworld.size + 2):
         walls.append(pygame.Rect(i*size_image, 0, size_image + 2, size_image))
-        walls.append(pygame.Rect(i*size_image, 320-size_image, size_image + 2, size_image))
+        walls.append(pygame.Rect(i*size_image, size_gui-size_image, size_image + 2, size_image))
     
     for i in range(gridworld.size):
         walls.append(pygame.Rect(0, (i+1)*size_image, size_image, size_image + 2))
-        walls.append(pygame.Rect(320-size_image, (i+1)*size_image, size_image, size_image + 2))
+        walls.append(pygame.Rect(size_gui-size_image, (i+1)*size_image, size_image, size_image + 2))
             
-    big_treasure = pygame.Rect(320 - 2*size_image, 320 - 2*size_image, size_image, size_image)
-    small_treasure = pygame.Rect(320 - 2*size_image, size_image, size_image, size_image)
+    big_treasure = pygame.Rect(size_gui - 2*size_image, size_gui - 2*size_image, size_image, size_image)
+    small_treasure = pygame.Rect(size_gui - 2*size_image, size_image, size_image, size_image)
     
     player = pygame.Rect(size_image, size_image, size_image, size_image)
     
@@ -216,7 +216,7 @@ def main_VAPOR():
     # After training
     if show_final_path:
         # clear_screen()
-        gui(gridworld, VAPOR_agent)
+        gui(gridworld, VAPOR_agent, size_gui=640)
 
     # print("Q-state -> lambda")
     # for i in range(len(VAPOR_agent.legal_qstates)):
