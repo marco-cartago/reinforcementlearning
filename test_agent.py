@@ -141,25 +141,7 @@ def main_QLEARNING():
 
     # After training
     if show_final_path:
-        clear_screen()
-        print("\n=== Final Learned Path ===")
-
-        # Reset environment for final demonstration
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-        steps = 0
-
-        while not gridworld.is_terminated and steps < max_steps_per_episode:
-            s = gridworld.agent_pos
-            a = q_agent.best_action(s)
-            reward = gridworld.do_action(a)
-            steps += 1
-            clear_screen()
-            print(gridworld)
-            time.sleep(0.1)  # Slow down for visualization
-
-        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-        print(f"Steps taken: {steps}")
+        gui(gridworld, q_agent, size_gui=640)
 
     # Plot rewards
     import matplotlib.pyplot as plt
@@ -290,25 +272,7 @@ def main_SoftQLEARNING():
 
     # After training
     if show_final_path:
-        clear_screen()
-        print("\n=== Final Learned Path ===")
-
-        # Reset environment for final demonstration
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-        steps = 0
-
-        while not gridworld.is_terminated and steps < max_steps_per_episode:
-            s = gridworld.agent_pos
-            a = soft_q_agent.best_action(s)
-            reward = gridworld.do_action(a)
-            steps += 1
-            clear_screen()
-            print(gridworld)
-            time.sleep(0.1)  # Slow down for visualization
-
-        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-        print(f"Steps taken: {steps}")
+        gui(gridworld, soft_q_agent, size_gui=640)
 
     # Dopo il training, prima del plot:
     print("Path finale (greedy):")
