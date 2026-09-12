@@ -10,8 +10,10 @@ from utils import GridWorldConfig
 from agents import QLearning, Vapor, SoftQLearning
 from tqdm import tqdm
 
-BASE_SIZE = 15
-N_EPISODES = 200
+import pygame
+
+BASE_SIZE = 6
+N_EPISODES = 50
 MAX_STEPS_PER_EPISODE = 2 * (BASE_SIZE + 1)
 
 CONFIG = GridWorldConfig(
@@ -27,6 +29,68 @@ CONFIG = GridWorldConfig(
     gamma=0.995, 
     random_state=1
 )
+
+def gui(gridworld, agent, size_gui = 320):
+    print("\n=== Final Learned Path ===")
+    
+    # Reset environment for final demonstration
+    gridworld = GridWorld(CONFIG)
+    gridworld.reset()
+    
+    size_image = size_gui / (gridworld.size + 2)
+
+    pygame.init()
+    pygame.display.set_caption("=== Final Learned Path ===")
+    screen = pygame.display.set_mode((size_gui, size_gui))
+    clock = pygame.time.Clock()
+    walls = []
+    
+    for i in range(gridworld.size):
+        for j in range(gridworld.size):
+            if gridworld.grid[i, j] == gridworld.WALL:
+                walls.append(pygame.Rect((j+1)*size_image, (i+1)*size_image, size_image, size_image))
+    
+    for i in range(gridworld.size + 2):
+        walls.append(pygame.Rect(i*size_image, 0, size_image + 2, size_image))
+        walls.append(pygame.Rect(i*size_image, size_gui-size_image, size_image + 2, size_image))
+    
+    for i in range(gridworld.size):
+        walls.append(pygame.Rect(0, (i+1)*size_image, size_image, size_image + 2))
+        walls.append(pygame.Rect(size_gui-size_image, (i+1)*size_image, size_image, size_image + 2))
+            
+    big_treasure = pygame.Rect(size_gui - 2*size_image, size_gui - 2*size_image, size_image, size_image)
+    small_treasure = pygame.Rect(size_gui - 2*size_image, size_image, size_image, size_image)
+    
+    player = pygame.Rect(size_image, size_image, size_image, size_image)
+    
+    steps = 0
+    while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
+        s = gridworld.agent_pos
+        a = agent.best_action(steps, s)
+        reward = gridworld.do_action(a)
+        steps += 1
+    
+        player.x = (gridworld.agent_pos[1] + 1) * size_image
+        player.y = (gridworld.agent_pos[0] + 1) * size_image
+    
+        time.sleep(1.0)  # Slow down for visualization
+        #clear_screen()
+        #print(gridworld)
+        clock.tick(60)
+    
+        # Draw the scene
+        screen.fill((0, 0, 0))
+        for wall in walls:
+            pygame.draw.rect(screen, (255, 255, 255), wall)
+        pygame.draw.rect(screen, (0, 255, 0), big_treasure)
+        pygame.draw.rect(screen, (0, 128, 0), small_treasure)
+        pygame.draw.rect(screen, (255, 200, 0), player)
+        pygame.display.flip()
+        clock.tick(360)
+    
+    pygame.quit()
+    print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
+    print(f"Steps taken: {steps}")
 
 def clear_screen():
     command = "cls" if os.name == "nt" else "clear"
@@ -77,25 +141,7 @@ def main_QLEARNING():
 
     # After training
     if show_final_path:
-        clear_screen()
-        print("\n=== Final Learned Path ===")
-
-        # Reset environment for final demonstration
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-        steps = 0
-
-        while not gridworld.is_terminated and steps < max_steps_per_episode:
-            s = gridworld.agent_pos
-            a = q_agent.best_action(s)
-            reward = gridworld.do_action(a)
-            steps += 1
-            clear_screen()
-            print(gridworld)
-            time.sleep(0.1)  # Slow down for visualization
-
-        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-        print(f"Steps taken: {steps}")
+        gui(gridworld, q_agent, size_gui=640)
 
     # Plot rewards
     import matplotlib.pyplot as plt
@@ -112,7 +158,7 @@ def main_QLEARNING():
 def main_VAPOR():
     # Initialize the environment
     gridworld = GridWorld(CONFIG)
-    print(gridworld)
+    # print(gridworld)
 
     # Terminal states are the treasure positions
     terminal_states = [a2idx(gridworld.treasure_pos), a2idx(gridworld.small_treasure_pos)]
@@ -151,26 +197,8 @@ def main_VAPOR():
 
     # After training
     if show_final_path:
-        clear_screen()
-        print("\n=== Final Learned Path ===")
-
-        # Reset environment for final demonstration
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-
-        steps = 0
-        while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
-            s = gridworld.agent_pos
-            a = VAPOR_agent.best_action(steps, s)
-            reward = gridworld.do_action(a)
-            steps += 1
-
-            time.sleep(1.0)  # Slow down for visualization
-            clear_screen()
-            print(gridworld)
-
-        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-        print(f"Steps taken: {steps}")
+        # clear_screen()
+        gui(gridworld, VAPOR_agent, size_gui=640)
 
     # print("Q-state -> lambda")
     # for i in range(len(VAPOR_agent.legal_qstates)):
@@ -244,25 +272,7 @@ def main_SoftQLEARNING():
 
     # After training
     if show_final_path:
-        clear_screen()
-        print("\n=== Final Learned Path ===")
-
-        # Reset environment for final demonstration
-        gridworld = GridWorld(CONFIG)
-        gridworld.reset()
-        steps = 0
-
-        while not gridworld.is_terminated and steps < max_steps_per_episode:
-            s = gridworld.agent_pos
-            a = soft_q_agent.best_action(s)
-            reward = gridworld.do_action(a)
-            steps += 1
-            clear_screen()
-            print(gridworld)
-            time.sleep(0.1)  # Slow down for visualization
-
-        print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-        print(f"Steps taken: {steps}")
+        gui(gridworld, soft_q_agent, size_gui=640)
 
     # Dopo il training, prima del plot:
     print("Path finale (greedy):")
