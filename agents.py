@@ -242,7 +242,7 @@ class Vapor(Agent):
         # I have to build the first time the constaints in the optimizer
         self._problem_is_initialized = False
 
-    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-1):
+    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-7):
         """
         Performs the bayesian update only on those states wich have been visited.
         Internally updates the means and the variances, it:
@@ -271,7 +271,7 @@ class Vapor(Agent):
             self.curr_reward_mean[idx] = self.curr_reward_variance[idx] * (mu[idx] / s[idx] + mu_p / s_p)
 
 
-    def lambda_stat_constraint(self, x: cp.Variable):
+    def lambda_stat_constraint(self, x: cp.Variable) -> list[cp.Constraint]:
         """
         Imposess the stationarity constraint on the varaible passed as input.
         Assumes that the structure of `x` is the same as the one of
@@ -323,13 +323,14 @@ class Vapor(Agent):
         return constraints
 
     def update_lambda(self, solver: str = "CLARABEL", verbose: bool = False) -> None:
-
+        # OSQP
         if not self._problem_is_initialized:
             self._nv = len(self.legal_qstates) # Number of varaibles
-            self._x = cp.Variable(self._nv)
-            self._y = cp.Variable(self._nv) # Auxiluiary variables
-            self._r = cp.Parameter(self._nv)
-            self._s = cp.Parameter(self._nv, nonneg=True)
+            idxs = []
+            self._x = cp.Variable(self._nv, bounds=[np.zeros(self._nv), np.ones(self._nv)], sparsity=idxs)
+            self._y = cp.Variable(self._nv, bounds=[np.zeros(self._nv), np.ones(self._nv)], sparsity=idxs) # Auxiluiary variables
+            self._r = cp.Parameter(self._nv,               sparsity=idxs)
+            self._s = cp.Parameter(self._nv, nonneg=True,  sparsity=idxs)
             self._r.value = self.curr_reward_mean
             self._s.value = self.curr_reward_variance
 
@@ -341,8 +342,7 @@ class Vapor(Agent):
             X = cp.vstack([2 * self._y, self._x - self._t])
             soc_constr = [cp.SOC(self._x + self._t, X, axis=0)]      
 
-            pos_constraints = [self._x >= 0, self._y >= 0]
-            self._constraints = soc_constr + entropy_constr + pos_constraints + self.lambda_stat_constraint(self._x)
+            self._constraints = soc_constr + entropy_constr + self.lambda_stat_constraint(self._x)
         
             self._problem = cp.Problem(self._objective, self._constraints)
             self._problem_is_initialized = True
@@ -350,7 +350,11 @@ class Vapor(Agent):
         self._r.value = self.curr_reward_mean
         self._s.value = self.curr_reward_variance
         try:
-            self._problem.solve(solver=solver, verbose=verbose, canon_backend=cp.COO_CANON_BACKEND)
+            self._problem.solve(
+                solver=solver,
+                tol_gap_abs = 1e-5,
+                verbose=verbose,
+            )
         except Exception as e:
             print(e)
 
@@ -416,6 +420,7 @@ class Vapor(Agent):
 
     def get_action(self, *args, **kwargs):
         return self.sample_action(*args, **kwargs)
+
 
 
 class SoftQLearning(Agent):

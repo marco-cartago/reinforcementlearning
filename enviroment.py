@@ -211,7 +211,7 @@ class GridWorld(object):
 
         step_penalty = 0
         t_reward = 0
-        if np.array_equal(move, self.RIGHT):
+        if np.array_equal(move, self.RIGHT) or np.array_equal(move, self.DOWN):
             step_penalty = self.step_penalty / self.size
 
         start_agent_pos = self.agent_pos.copy()
