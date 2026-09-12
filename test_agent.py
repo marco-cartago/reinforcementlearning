@@ -233,12 +233,12 @@ def main_SoftQLEARNING():
     # Terminal states are the treasure positions
     terminal_states = [gridworld.treasure_pos, gridworld.small_treasure_pos]
 
-    temp_start = 5e-3
+    temp_start = 1e-1
     temp_end = 1e-4
 
     # Initialize Q-learning agent
     soft_q_agent = SoftQLearning(gridworld, terminal_states, alpha=1, temperature=temp_start)
-    n_episodes = 20_000
+    n_episodes = 10_000
     max_steps_per_episode = MAX_STEPS_PER_EPISODE
     show_final_path = True
     episode_rewards = []
@@ -268,12 +268,12 @@ def main_SoftQLEARNING():
 
         if gridworld.agent_pos[1] != gridworld.size - 1:
             tmp = gridworld.current_episode[-1]
-            tmp_2 = (tmp[0], tmp[1], tmp[2], -1)
+            tmp_2 = (tmp[0], tmp[1], tmp[2], -0.125)
             gridworld.current_episode.pop(-1)
             gridworld.current_episode.append(tmp_2)
         elif gridworld.agent_pos[0] != gridworld.size - 1 and gridworld.agent_pos[0] != 0:
             tmp = gridworld.current_episode[-1]
-            tmp_2 = (tmp[0], tmp[1], tmp[2], -1)
+            tmp_2 = (tmp[0], tmp[1], tmp[2], -0.125)
             gridworld.current_episode.pop(-1)
             gridworld.current_episode.append(tmp_2)
 
