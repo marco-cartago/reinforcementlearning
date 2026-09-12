@@ -66,7 +66,10 @@ def gui(gridworld, agent, size_gui = 320):
     steps = 0
     while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
         s = gridworld.agent_pos
-        a = agent.best_action(steps, s)
+        if isinstance(agent, Vapor):
+            a = agent.best_action(steps, s)
+        else:
+            a = agent.best_action(s)
         reward = gridworld.do_action(a)
         steps += 1
     
@@ -263,6 +266,17 @@ def main_SoftQLEARNING():
                 print(gridworld)
                 time.sleep(0.01)
 
+        if gridworld.agent_pos[1] != gridworld.size - 1:
+            tmp = gridworld.current_episode[-1]
+            tmp_2 = (tmp[0], tmp[1], tmp[2], -1)
+            gridworld.current_episode.pop(-1)
+            gridworld.current_episode.append(tmp_2)
+        elif gridworld.agent_pos[0] != gridworld.size - 1 and gridworld.agent_pos[0] != 0:
+            tmp = gridworld.current_episode[-1]
+            tmp_2 = (tmp[0], tmp[1], tmp[2], -1)
+            gridworld.current_episode.pop(-1)
+            gridworld.current_episode.append(tmp_2)
+
         # Learn
         soft_q_agent.learn_from_episode()
 
@@ -302,5 +316,5 @@ def main_SoftQLEARNING():
 if __name__ == "__main__":
     clear_screen()
     # main_QLEARNING()
-    main_VAPOR()
-    # main_SoftQLEARNING()
+    # main_VAPOR()
+    main_SoftQLEARNING()
