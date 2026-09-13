@@ -54,6 +54,17 @@ def run_single_simulation(
                 a = agent.get_action(s)
             total_reward += gridworld.do_action(a)
             steps += 1
+
+        if gridworld.agent_pos[1] != gridworld.size - 1:
+            tmp = gridworld.current_episode[-1]
+            tmp_2 = (tmp[0], tmp[1], tmp[2], -0.125)
+            gridworld.current_episode.pop(-1)
+            gridworld.current_episode.append(tmp_2)
+        elif gridworld.agent_pos[0] != gridworld.size - 1 and gridworld.agent_pos[0] != 0:
+            tmp = gridworld.current_episode[-1]
+            tmp_2 = (tmp[0], tmp[1], tmp[2], -0.125)
+            gridworld.current_episode.pop(-1)
+            gridworld.current_episode.append(tmp_2)
         
         agent.learn_from_episode()
         rewards[episode] = total_reward
