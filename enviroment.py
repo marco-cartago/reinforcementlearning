@@ -245,3 +245,81 @@ class GridWorld(object):
         self.total_reward += self.step_penalty * self.gamma**self.step
 
         return reward
+
+class MultiArmedBandit(object):
+    
+    START = np.array([0])
+
+    def __init__(self, size: int, var_of_mu: float, shape: float, scale:float, gamma=1.0, random_state=0):
+
+        self.size = size
+        self.var_of_mu = var_of_mu
+        self.shape = shape
+        self.scale = scale
+        self.gamma = gamma
+
+        self.is_terminated = False
+
+        self.current_episode = []
+        self.r_st = np.random.RandomState(random_state)
+
+        self.agent_start = self.START
+        self.agent_pos = self.START
+        self.terminal_states = []
+
+        # Means 
+        self.mu = self.r_st.randn(size) * var_of_mu
+        self.va = self.r_st.gamma(
+            shape=(np.ones(size) * shape), 
+            scale=(np.ones(size) * scale), 
+            size=(size,)
+        )
+
+    def __str__(self) -> str:
+        return (f" Means {str(self.mu)}") + "\n" + (f" Vars  {str(self.va)}") + "\n"
+
+
+    def reset(self):
+        """Reset the gridworld to the initial state"""
+        self.agent_pos = self.agent_start.copy()
+        self.step = 0
+        self.is_terminated = False
+        self.total_reward = 0
+        self.current_episode = []
+
+    def get_actions(self):
+        """Given the current agent positon return the legal actions"""
+        if self.is_terminated:
+            return []
+        else:
+            return [np.array(i,) for i in range(self.size)]
+
+
+    def get_legal_actions(self, cpos: np.ndarray):
+        """Given the current agent positon return the legal actions"""
+        if self.is_terminated:
+            return []
+        else:
+            return range(self.size)
+
+    def get_episode(self) -> list:
+        return self.current_episode
+
+
+    def do_action(self, move: np.ndarray) -> float:
+        """
+        Moves the agent in the gridworld and returns the reward for that action,
+        does not check for the legality of the action
+        """
+        # Perform a random action with probability temperature
+        self.is_terminated = True
+        idx = move[0]
+        end_pos = np.array([0, idx])
+        self.agent_pos = end_pos
+
+        reward = float(self.mu[idx] + self.r_st.randn() * self.va[idx])
+
+        sasr = (self.agent_pos, move, end_pos, reward)
+        self.current_episode.append(sasr)
+
+        return reward
