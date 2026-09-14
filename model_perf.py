@@ -145,8 +145,8 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 
 if __name__ == "__main__":
     # Base Configurations
-    BASE_SIZE = 8
-    MAX_EPISODES = 50
+    BASE_SIZE = 10
+    MAX_EPISODES = 50_000
     MAX_STEPS = 3 * BASE_SIZE
 
     DEFAULT_CONFIG = GridWorldConfig(
@@ -196,82 +196,82 @@ if __name__ == "__main__":
         "VAPOR": (Vapor, vapor_config)
     }
 
-    model_name = "VAPOR"
-    model_class, model_config = models_dict[model_name]
+    for model_name in ["Q-learning", "Soft-Q-Learning"]:
+        model_class, model_config = models_dict[model_name]
 
-    # Reward vs Dimension -------------------------------------------------------------------------
-    dimensions = [4, 6]#[dim for dim in range(4, 16, 2)]
-    dim_results = []
-    print("Running Dimension Experiment...")
-    for d in tqdm(dimensions):
-        cfg = deepcopy(DEFAULT_CONFIG)
-        cfg.size = d # Update dimension
-        max_steps = 2*d
+        # Reward vs Dimension -------------------------------------------------------------------------
+        dimensions = [dim for dim in range(3, 20, 2)]
+        dim_results = []
+        print("Running Dimension Experiment...")
+        for d in tqdm(dimensions):
+            cfg = deepcopy(DEFAULT_CONFIG)
+            cfg.size = d # Update dimension
+            max_steps = 2*d
 
-        if model_name == "VAPOR":
-            vapor_config["gridworld"] = GridWorld(cfg)
-            vapor_config["horizon"] = max_steps
+            if model_name == "VAPOR":
+                vapor_config["gridworld"] = GridWorld(cfg)
+                vapor_config["horizon"] = max_steps
 
-        res = run_experiment(
-            model_class, 
-            model_config, 
-            cfg, 
-            max_episodes=MAX_EPISODES, 
-            max_steps=max_steps, 
-            n_simulations=5
+            res = run_experiment(
+                model_class, 
+                model_config, 
+                cfg, 
+                max_episodes=MAX_EPISODES, 
+                max_steps=max_steps, 
+                n_simulations=5
+            )
+            dim_results.append(res[:, -1]) 
+        plot_reward_vs_dimension(
+            dimensions, 
+            dim_results, 
+            f"./figures/{model_name}_dim_study_{time.time_ns()}.png", 
+            model_name, 
+            n_epsiodes=MAX_EPISODES
         )
-        dim_results.append(res[:, -1]) 
-    plot_reward_vs_dimension(
-        dimensions, 
-        dim_results, 
-        f"./figures/{model_name}_dim_study_{time.time_ns()}.png", 
-        model_name, 
-        n_epsiodes=MAX_EPISODES
-    )
 
 
-    # Reward vs Episode Number --------------------------------------------------------------------
-    ep_counts = [5, 20, 40, 80, 100]#[10] + [e for e in range(100, 2500 + 100, 100)] + [5000]
-    ep_results = []
-    print("Running Episode Count Experiment...")
-    for e in tqdm(ep_counts):
+        # Reward vs Episode Number --------------------------------------------------------------------
+        ep_counts =  [10] + [e for e in range(100, 2500 + 100, 100)] + [5000]
+        ep_results = []
+        print("Running Episode Count Experiment...")
+        for e in tqdm(ep_counts):
 
-        if model_name == "VAPOR":
-            vapor_config["gridworld"] = GridWorld(DEFAULT_CONFIG)
-            vapor_config["horizon"] = e
+            if model_name == "VAPOR":
+                vapor_config["gridworld"] = GridWorld(DEFAULT_CONFIG)
+                vapor_config["horizon"] = e
 
-        res = run_experiment(
+            res = run_experiment(
+                model_class, 
+                model_config, 
+                DEFAULT_CONFIG, 
+                max_episodes=e, 
+                max_steps=e, 
+                n_simulations=5
+            )
+            ep_results.append(res[:, -1])
+
+        plot_reward_vs_episodes(
+            ep_counts, 
+            ep_results, 
+            f"./figures/{model_name}_ep_study_{time.time_ns()}.png"
+        )
+
+
+        model_class, model_config = models_dict[model_name]
+
+        # Learning Curve (Single Agent Journey) -------------------------------------------------------
+        print("Running Learning Curve Simulation...")
+        learning_data = run_experiment(
             model_class, 
             model_config, 
             DEFAULT_CONFIG, 
-            max_episodes=e, 
-            max_steps=e, 
-            n_simulations=5
+            max_episodes=MAX_EPISODES, 
+            max_steps=MAX_STEPS, 
+            n_simulations=5, 
+            decay_alpha=True
         )
-        ep_results.append(res[:, -1])
-
-    plot_reward_vs_episodes(
-        ep_counts, 
-        ep_results, 
-        f"./figures/{model_name}_ep_study_{time.time_ns()}.png"
-    )
-
-
-    model_class, model_config = models_dict[model_name]
-
-    # Learning Curve (Single Agent Journey) -------------------------------------------------------
-    print("Running Learning Curve Simulation...")
-    learning_data = run_experiment(
-        model_class, 
-        model_config, 
-        DEFAULT_CONFIG, 
-        max_episodes=MAX_EPISODES, 
-        max_steps=MAX_STEPS, 
-        n_simulations=5, 
-        decay_alpha=True
-    )
-    plot_learning_curve(
-        learning_data, 
-        f"./figures/{model_name}_learning_curve_{time.time_ns()}.png", 
-        "SoftQLearning Convergence over 1000 Episodes"
-    )
+        plot_learning_curve(
+            learning_data, 
+            f"./figures/{model_name}_learning_curve_{time.time_ns()}.png", 
+            "SoftQLearning Convergence over 1000 Episodes"
+        )

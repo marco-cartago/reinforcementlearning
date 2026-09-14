@@ -8,7 +8,7 @@ def main_VAPOR_bandit():
     VAR_OF_MU = 1.0          
     SHAPE = 1.0              
     SCALE = 1.0             
-    N_EPISODES = 1_000
+    N_EPISODES = 10_000
     
     bandit = MultiArmedBandit(
         size=MAB_SIZE, 
@@ -18,7 +18,7 @@ def main_VAPOR_bandit():
     )
     episode_rewards = []
 
-    agent = SoftQLearningBandit(bandit)
+    agent = VaporBandit(bandit)
     print(bandit)
 
     for ep in range(N_EPISODES):
