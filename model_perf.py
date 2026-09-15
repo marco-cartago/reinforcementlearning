@@ -211,7 +211,7 @@ if __name__ == "__main__":
         model_class, model_config = models_dict[model_name]
 
         # Reward vs Dimension -------------------------------------------------------------------------
-        dimensions = [dim for dim in range(4, 10, 2)]
+        dimensions = [3] + [dim for dim in range(4, 10, 2)] + [10] + [12]
         dim_results = []
         print("Running Dimension Experiment...")
         for d in tqdm(dimensions):
