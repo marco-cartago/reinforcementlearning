@@ -186,6 +186,12 @@ class GridWorld(object):
        
         if s_right[0] != self.size and self.grid[a2idx(s_right)] != self.WALL:
             actions.append(self.RIGHT)
+        else:
+            '''
+            try:
+                print(self.grid[a2idx(s_right)], c_pos)
+            except:
+                print(s_right[0])'''
 
         return actions
 

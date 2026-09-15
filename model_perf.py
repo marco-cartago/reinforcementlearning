@@ -211,7 +211,7 @@ if __name__ == "__main__":
         model_class, model_config = models_dict[model_name]
 
         # Reward vs Dimension -------------------------------------------------------------------------
-        dimensions = [3] + [dim for dim in range(4, 13, 2)]
+        dimensions = [3] + [dim for dim in range(4, 11, 2)]
         dim_results = []
         print("Running Dimension Experiment...")
         for d in tqdm(dimensions):
@@ -293,5 +293,5 @@ if __name__ == "__main__":
         plot_learning_curve(
             learning_data, 
             f"./figures/{model_name}_learning_curve_{time.time_ns()}.png", 
-            "SoftQLearning Convergence over 1000 Episodes"
+            f"{model_name} Convergence over 1000 Episodes"
         )

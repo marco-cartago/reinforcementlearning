@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 import pygame
 
-BASE_SIZE = 6
+BASE_SIZE = 3
 N_EPISODES = 50
 MAX_STEPS_PER_EPISODE = 2 * (BASE_SIZE + 1)
 
@@ -30,70 +30,565 @@ CONFIG = GridWorldConfig(
     random_state=1
 )
 
-def gui(gridworld, agent, size_gui = 320):
-    print("\n=== Final Learned Path ===")
-    
-    # Reset environment for final demonstration
-    gridworld = GridWorld(CONFIG)
-    gridworld.reset()
-    
-    size_image = size_gui / (gridworld.size + 2)
+
+def get_gui_direction(gridworld, action):
+
+    if np.array_equal(action, gridworld.UP):
+        return "RIGHT"
+
+    if np.array_equal(action, gridworld.DOWN):
+        return "LEFT"
+
+    if np.array_equal(action, gridworld.LEFT):
+        return "UP"
+
+    if np.array_equal(action, gridworld.RIGHT):
+        return "DOWN"
+
+    return None
+
+
+def value_to_color(value, vmin, vmax):
+
+    if vmax < 1e-3:
+        vmax = vmin
+
+    if vmax <= vmin:
+        t = 0.5
+    else:
+        t = (value - vmin) / (vmax - vmin)
+
+    t = np.clip(t, 0.0, 1.0)
+
+    # Blue -> cyan -> yellow
+    if t < 0.5:
+
+        u = t / 0.5
+
+        r = int(30 + (50 - 30) * u)
+        g = int(80 + (200 - 80) * u)
+        b = int(180 + (255 - 180) * u)
+
+    else:
+
+        u = (t - 0.5) / 0.5
+
+        r = int(50 + (255 - 50) * u)
+        g = int(200 + (220 - 200) * u)
+        b = int(255 - (255 - 40) * u)
+
+    return (r, g, b)
+
+
+def draw_value_in_triangle(
+    screen,
+    points,
+    value,
+    direction,
+    font,
+    selected=False,
+    vmin=0.0,
+    vmax=1.0
+):
+
+    top_left, top_right, bottom_left, bottom_right, center = points
+
+    if direction == "UP":
+
+        polygon = [
+            top_left,
+            top_right,
+            center
+        ]
+
+        text_pos = (
+            center[0],
+            top_left[1] + 0.30 * (center[1] - top_left[1])
+        )
+
+    elif direction == "DOWN":
+
+        polygon = [
+            bottom_left,
+            bottom_right,
+            center
+        ]
+
+        text_pos = (
+            center[0],
+            center[1] + 0.70 * (bottom_left[1] - center[1])
+        )
+
+    elif direction == "LEFT":
+
+        polygon = [
+            top_left,
+            bottom_left,
+            center
+        ]
+
+        text_pos = (
+            top_left[0] + 0.30 * (center[0] - top_left[0]),
+            center[1]
+        )
+
+    elif direction == "RIGHT":
+
+        polygon = [
+            top_right,
+            bottom_right,
+            center
+        ]
+
+        text_pos = (
+            center[0] + 0.70 * (top_right[0] - center[0]),
+            center[1]
+        )
+
+    else:
+        return
+
+    color = value_to_color(
+        value,
+        vmin,
+        vmax
+    )
+
+    # Selected action gets a black border
+    border_color = (20, 20, 20)
+    border_width = 2 if selected else 1
+
+    pygame.draw.polygon(
+        screen,
+        color,
+        polygon
+    )
+
+    pygame.draw.polygon(
+        screen,
+        border_color,
+        polygon,
+        border_width
+    )
+
+    text = font.render(
+        f"{value:.3f}",
+        True,
+        (0, 0, 0)
+    )
+
+    text_rect = text.get_rect(
+        center=(
+            int(text_pos[0]),
+            int(text_pos[1])
+        )
+    )
+
+    screen.blit(
+        text,
+        text_rect
+    )
+
+def get_action_value(agent, state, action, step=0):
+
+    if isinstance(agent, Vapor):
+
+        key = (
+            step,
+            a2idx(state),
+            a2idx(action)
+        )
+
+        if key not in agent.qstate_to_idx:
+            return None
+
+        return agent.lamb(
+            step,
+            state,
+            action
+        )
+
+    elif isinstance(agent, (QLearning, SoftQLearning)):
+
+        return agent.Q(
+            state,
+            action
+        )
+
+    raise TypeError(
+        f"Unsupported agent type: {type(agent).__name__}"
+    )
+
+
+def draw_grid_values(
+    screen,
+    gridworld,
+    for_lambdas,
+    agent,
+    step,
+    font,
+    selected_action=None
+):
+
+    for state in for_lambdas.keys():
+
+        state_np = np.array(state)
+
+        cell = gridworld.grid[a2idx(state_np)]
+
+        if cell == gridworld.WALL:
+            continue
+
+        if cell == gridworld.TREASURE:
+            continue
+
+        if cell == gridworld.SMALL_TREASURE:
+            continue
+
+        legal_actions = gridworld.get_legal_actions(
+            state_np
+        )
+
+        # -----------------------------------------------------
+        # First collect values
+        # -----------------------------------------------------
+
+        action_values = []
+
+        for action in legal_actions:
+
+            value = get_action_value(
+                agent,
+                state_np,
+                action,
+                step
+            )
+
+            if value is None:
+                continue
+
+            direction = get_gui_direction(
+                gridworld,
+                action
+            )
+
+            if direction is None:
+                continue
+
+            action_values.append(
+                (action, direction, value)
+            )
+
+        if not action_values:
+            continue
+
+        values = [
+            value
+            for _, _, value in action_values
+        ]
+
+        vmin = min(values)
+        vmax = max(values)
+
+        # -----------------------------------------------------
+        # Draw
+        # -----------------------------------------------------
+
+        for action, direction, value in action_values:
+
+            selected = (
+                selected_action is not None
+                and np.array_equal(
+                    state_np,
+                    gridworld.agent_pos
+                )
+                and np.array_equal(
+                    action,
+                    selected_action
+                )
+            )
+
+            draw_value_in_triangle(
+                screen=screen,
+                points=for_lambdas[state],
+                value=value,
+                direction=direction,
+                font=font,
+                selected=selected,
+                vmin=vmin,
+                vmax=vmax
+            )
+
+
+def draw_walls_and_border(
+    screen,
+    gridworld,
+    size_image
+):
+
+    border_width = int(size_image)
+
+    # Top
+    pygame.draw.rect(
+        screen,
+        (50, 50, 50),
+        pygame.Rect(
+            0,
+            0,
+            (gridworld.size + 2) * size_image,
+            size_image
+        )
+    )
+
+    # Bottom
+    pygame.draw.rect(
+        screen,
+        (50, 50, 50),
+        pygame.Rect(
+            0,
+            (gridworld.size + 1) * size_image,
+            (gridworld.size + 2) * size_image,
+            size_image
+        )
+    )
+
+    # Left
+    pygame.draw.rect(
+        screen,
+        (50, 50, 50),
+        pygame.Rect(
+            0,
+            0,
+            size_image,
+            (gridworld.size + 2) * size_image
+        )
+    )
+
+    # Right
+    pygame.draw.rect(
+        screen,
+        (50, 50, 50),
+        pygame.Rect(
+            (gridworld.size + 1) * size_image,
+            0,
+            size_image,
+            (gridworld.size + 2) * size_image
+        )
+    )
+
+    for r in range(gridworld.size):
+        for c in range(gridworld.size):
+
+            if gridworld.grid[r, c] == gridworld.WALL:
+
+                wall = pygame.Rect(
+                    (c + 1) * size_image,
+                    (r + 1) * size_image,
+                    size_image + 1,
+                    size_image + 1
+                )
+
+                pygame.draw.rect(
+                    screen,
+                    (50, 50, 50),
+                    wall
+                )
+
+
+def draw_treasures(
+    screen,
+    gridworld,
+    size_image
+):
+
+    # Big treasure
+    treasure = pygame.Rect(
+        (gridworld.treasure_pos[1] + 1) * size_image,
+        (gridworld.treasure_pos[0] + 1) * size_image,
+        size_image + 1,
+        size_image + 1
+    )
+
+    pygame.draw.rect(
+        screen,
+        (0, 255, 0),
+        treasure
+    )
+
+    # Small treasure
+    small_treasure = pygame.Rect(
+        (gridworld.small_treasure_pos[1] + 1) * size_image,
+        (gridworld.small_treasure_pos[0] + 1) * size_image,
+        size_image + 1,
+        size_image + 1
+    )
+
+    pygame.draw.rect(
+        screen,
+        (0, 128, 0),
+        small_treasure
+    )
+
+
+def gui(gridworld, agent, size_gui=640):
 
     pygame.init()
-    pygame.display.set_caption("=== Final Learned Path ===")
-    screen = pygame.display.set_mode((size_gui, size_gui))
+
+    gridworld.reset()
+
+    size_image = size_gui / (gridworld.size + 2)
+
+    screen = pygame.display.set_mode(
+        (int(size_gui), int(size_gui))
+    )
+
+    pygame.display.set_caption(
+        "GridWorld"
+    )
+
     clock = pygame.time.Clock()
-    walls = []
-    
-    for i in range(gridworld.size):
-        for j in range(gridworld.size):
-            if gridworld.grid[i, j] == gridworld.WALL:
-                walls.append(pygame.Rect((j+1)*size_image, (i+1)*size_image, size_image, size_image))
-    
-    for i in range(gridworld.size + 2):
-        walls.append(pygame.Rect(i*size_image, 0, size_image + 2, size_image))
-        walls.append(pygame.Rect(i*size_image, size_gui-size_image, size_image + 2, size_image))
-    
-    for i in range(gridworld.size):
-        walls.append(pygame.Rect(0, (i+1)*size_image, size_image, size_image + 2))
-        walls.append(pygame.Rect(size_gui-size_image, (i+1)*size_image, size_image, size_image + 2))
-            
-    big_treasure = pygame.Rect(size_gui - 2*size_image, size_gui - 2*size_image, size_image, size_image)
-    small_treasure = pygame.Rect(size_gui - 2*size_image, size_image, size_image, size_image)
-    
-    player = pygame.Rect(size_image, size_image, size_image, size_image)
-    
+
+    font = pygame.font.SysFont(
+        "Arial",
+        max(10, int(size_image * 0.1))
+    )
+
+
+    for_lambdas = {}
+
+    for r in range(gridworld.size):
+        for c in range(gridworld.size):
+
+            if gridworld.grid[r, c] == gridworld.WALL:
+                continue
+
+            x = (c + 1) * size_image
+            y = (r + 1) * size_image
+
+            for_lambdas[(r, c)] = [
+
+                # top-left
+                (x, y),
+
+                # top-right
+                (x + size_image, y),
+
+                # bottom-left
+                (x, y + size_image),
+
+                # bottom-right
+                (x + size_image, y + size_image),
+
+                # center
+                (
+                    x + size_image / 2,
+                    y + size_image / 2
+                )
+            ]
+
+    player = pygame.Rect(
+        int(size_image),
+        int(size_image),
+        int(size_image + 1),
+        int(size_image + 1)
+    )
+
     steps = 0
-    while not gridworld.is_terminated and steps < MAX_STEPS_PER_EPISODE:
-        s = gridworld.agent_pos
+    running = True
+
+    while (
+        running
+        and not gridworld.is_terminated
+        and steps < MAX_STEPS_PER_EPISODE
+    ):
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                running = False
+
+        if not running:
+            break
+
+        state = gridworld.agent_pos.copy()
+
         if isinstance(agent, Vapor):
-            a = agent.best_action(steps, s)
+
+            action = agent.best_action(
+                steps,
+                state
+            )
+
         else:
-            a = agent.best_action(s)
-        reward = gridworld.do_action(a)
-        steps += 1
-    
-        player.x = (gridworld.agent_pos[1] + 1) * size_image
-        player.y = (gridworld.agent_pos[0] + 1) * size_image
-    
-        time.sleep(1.0)  # Slow down for visualization
-        #clear_screen()
-        #print(gridworld)
-        clock.tick(60)
-    
-        # Draw the scene
-        screen.fill((0, 0, 0))
-        for wall in walls:
-            pygame.draw.rect(screen, (255, 255, 255), wall)
-        pygame.draw.rect(screen, (0, 255, 0), big_treasure)
-        pygame.draw.rect(screen, (0, 128, 0), small_treasure)
-        pygame.draw.rect(screen, (255, 200, 0), player)
+
+            action = agent.best_action(
+                state
+            )
+
+        screen.fill(
+            (255, 255, 255)
+        )
+
+        draw_walls_and_border(
+            screen,
+            gridworld,
+            size_image
+        )
+
+        draw_grid_values(
+            screen,
+            gridworld,
+            for_lambdas,
+            agent,
+            steps,
+            font,
+            selected_action=action
+        )
+
+        draw_treasures(
+            screen,
+            gridworld,
+            size_image
+        )
+
+        # Player
+        player.x = int(
+            (gridworld.agent_pos[1] + 1)
+            * size_image
+        )
+
+        player.y = int(
+            (gridworld.agent_pos[0] + 1)
+            * size_image
+        )
+
+        pygame.draw.rect(
+            screen,
+            (255, 120, 255),
+            player
+        )
+
         pygame.display.flip()
-        clock.tick(360)
-    
+
+        clock.tick(60)
+
+        time.sleep(1.0)
+
+        gridworld.do_action(action)
+
+        steps += 1
+
+        player.x = int(
+            (gridworld.agent_pos[1] + 1)
+            * size_image
+        )
+
+        player.y = int(
+            (gridworld.agent_pos[0] + 1)
+            * size_image
+        )
+
     pygame.quit()
-    print(f"\nFinal Path Reward: {gridworld.total_reward:.2f}")
-    print(f"Steps taken: {steps}")
 
 def clear_screen():
     command = "cls" if os.name == "nt" else "clear"
@@ -338,5 +833,5 @@ def main_SoftQLEARNING():
 if __name__ == "__main__":
     clear_screen()
     # main_QLEARNING()
-    # main_VAPOR()
-    main_SoftQLEARNING()
+    main_VAPOR()
+    # main_SoftQLEARNING()
