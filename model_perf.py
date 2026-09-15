@@ -157,8 +157,8 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 if __name__ == "__main__":
     # Base Configurations
     BASE_SIZE = 10
-    MAX_EPISODES = 50_000
-    MAX_STEPS = 3 * BASE_SIZE
+    MAX_EPISODES = 250
+    MAX_STEPS = 2 * (BASE_SIZE + 1)
 
     DEFAULT_CONFIG = GridWorldConfig(
         size=BASE_SIZE, 
@@ -207,11 +207,11 @@ if __name__ == "__main__":
         "VAPOR": (Vapor, vapor_config)
     }
 
-    for model_name in ["Q-learning", "Soft-Q-Learning"]:
+    for model_name in ["Vapor"]:
         model_class, model_config = models_dict[model_name]
 
         # Reward vs Dimension -------------------------------------------------------------------------
-        dimensions = [dim for dim in range(3, 20, 2)]
+        dimensions = [dim for dim in range(4, 10, 2)]
         dim_results = []
         print("Running Dimension Experiment...")
         for d in tqdm(dimensions):
@@ -242,7 +242,7 @@ if __name__ == "__main__":
 
 
         # Reward vs Episode Number --------------------------------------------------------------------
-        ep_counts =  [10] + [e for e in range(100, 2500 + 100, 100)] + [5000]
+        ep_counts =  [10] + [e for e in range(100, 200, 25)] + [200] + [300]
         ep_results = []
         print("Running Episode Count Experiment...")
         for e in tqdm(ep_counts):
