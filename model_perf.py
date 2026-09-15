@@ -218,10 +218,12 @@ if __name__ == "__main__":
             cfg = deepcopy(DEFAULT_CONFIG)
             cfg.size = d # Update dimension
             max_steps = 2*(d + 1)
-
-            if model_name == "VAPOR":
-                vapor_config["gridworld"] = GridWorld(cfg)
-                vapor_config["horizon"] = max_steps
+            model_config["gridworld"] = GridWorld(cfg)
+            model_config["terminal_states"] = [
+                model_config["gridworld"].treasure_pos, 
+                model_config["gridworld"].small_treasure_pos
+            ] 
+            model_config["horizon"] = max_steps
 
             res = run_experiment(
                 model_class, 
@@ -229,9 +231,10 @@ if __name__ == "__main__":
                 cfg, 
                 max_episodes=MAX_EPISODES, 
                 max_steps=max_steps, 
-                n_simulations=5
+                n_simulations=10
             )
             dim_results.append(res[:, -1]) 
+
         plot_reward_vs_dimension(
             dimensions, 
             dim_results, 
@@ -246,10 +249,16 @@ if __name__ == "__main__":
         ep_results = []
         print("Running Episode Count Experiment...")
         for e in tqdm(ep_counts):
+            cfg = deepcopy(DEFAULT_CONFIG)
+            cfg.size = MAX_EPISODES # Update dimension
+            max_steps = 2*(MAX_EPISODES + 1)
+            model_config["gridworld"] = GridWorld(cfg)
+            model_config["terminal_states"] = [
+                model_config["gridworld"].treasure_pos, 
+                model_config["gridworld"].small_treasure_pos
+            ] 
+            model_config["horizon"] = max_steps
 
-            if model_name == "VAPOR":
-                vapor_config["gridworld"] = GridWorld(DEFAULT_CONFIG)
-                vapor_config["horizon"] = e
 
             res = run_experiment(
                 model_class, 
