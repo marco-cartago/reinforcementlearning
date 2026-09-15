@@ -207,7 +207,7 @@ if __name__ == "__main__":
         "VAPOR": (Vapor, vapor_config)
     }
 
-    for model_name in ["Vapor"]:
+    for model_name in ["VAPOR"]:
         model_class, model_config = models_dict[model_name]
 
         # Reward vs Dimension -------------------------------------------------------------------------
