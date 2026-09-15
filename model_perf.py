@@ -217,7 +217,7 @@ if __name__ == "__main__":
         for d in tqdm(dimensions):
             cfg = deepcopy(DEFAULT_CONFIG)
             cfg.size = d # Update dimension
-            max_steps = 2*d
+            max_steps = 2*(d + 1)
 
             if model_name == "VAPOR":
                 vapor_config["gridworld"] = GridWorld(cfg)
