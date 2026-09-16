@@ -41,3 +41,6 @@ After activating the enviroment and installing the required packages (in `requir
 
  - `main.py` For a demo of an agent in a gridworld-like labyrinth.
  - `test_agent.py` For a full demo of an agent training (either a classic Qlearning agent or a VAPPOR like one).
+ - `bandit_agents.py` Runs a demo for one of the algorithms on a simple Bandit-like problem.
+
+Unfortunately we were not able to optimise sufficenty the memory usage: the `CVXPY` requires a lot of memory even for small board sizes, so keep the size <10.
