@@ -162,7 +162,7 @@ if __name__ == "__main__":
 
     DEFAULT_CONFIG = GridWorldConfig(
         size=BASE_SIZE, 
-        p_walls=0.70, 
+        p_walls=0.50, 
         agent_start=np.array((0, 0)),
         step_penalty=-(1e-3), 
         small_treasure_rew=1e-3, 
