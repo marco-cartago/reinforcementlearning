@@ -564,7 +564,7 @@ def gui(gridworld, agent, size_gui=640):
 
         pygame.draw.rect(
             screen,
-            (255, 120, 255),
+            (255, 120, 255, 64),
             player
         )
 
