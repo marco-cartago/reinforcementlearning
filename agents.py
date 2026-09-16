@@ -242,7 +242,7 @@ class Vapor(Agent):
         # I have to build the first time the constaints in the optimizer
         self._problem_is_initialized = False
 
-    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-7):
+    def update_env_model(self, lsa_s: list, r_s: list[float], noise: float = 1e-3):
         """
         Performs the bayesian update only on those states wich have been visited.
         Internally updates the means and the variances, it:

@@ -13,19 +13,19 @@ from tqdm import tqdm
 
 import pygame
 
-BASE_SIZE = 3
-N_EPISODES = 50
-MAX_STEPS_PER_EPISODE = 2 * (BASE_SIZE + 1)
+BASE_SIZE = 5
+N_EPISODES = 500
+MAX_STEPS_PER_EPISODE = 8
 
 CONFIG = GridWorldConfig(
     size=BASE_SIZE,
     p_walls=0.30,
     agent_start=np.array((0, 0)),
-    step_penalty=-(2**-10),
+    step_penalty=-(2**-8),
     small_treasure_rew=1e-3,
     treasure_rew=1,
-    sd_small_treasure=1e-3,
-    sd_treasure=1e-3,
+    sd_small_treasure=1e-1,
+    sd_treasure=1e-1,
     temperature=0.0,
     gamma=0.995,
     random_state=1,
@@ -313,6 +313,9 @@ def gui(gridworld, agent, size_gui=640):
 
     while running and steps < MAX_STEPS_PER_EPISODE and not_terminal_state:
 
+        if steps == 0:
+            time.sleep(10)
+
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
@@ -354,7 +357,7 @@ def gui(gridworld, agent, size_gui=640):
         pygame.display.flip()
 
         clock.tick(60)
-        time.sleep(1.0)
+        time.sleep(5.0)
 
         gridworld.do_action(action)
 
@@ -462,7 +465,9 @@ def main_VAPOR():
     episode_rewards = []
 
     # Initialize VAPOR agent
-    VAPOR_agent = Vapor(gridworld, terminal_states, horizon=MAX_STEPS_PER_EPISODE)
+    VAPOR_agent = Vapor(
+        gridworld, terminal_states, horizon=MAX_STEPS_PER_EPISODE, repbuffer_size=2
+    )
 
     for ep in range(n_episodes):
         # Reset environment
@@ -508,18 +513,6 @@ def main_VAPOR():
         # clear_screen()
         gui(gridworld, VAPOR_agent, size_gui=640)
 
-    # print("Q-state -> lambda")
-    # for i in range(len(VAPOR_agent.legal_qstates)):
-    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_lambda[i]}")
-
-    # print("Q-state -> Er")
-    # for i in range(len(VAPOR_agent.legal_qstates)):
-    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_mean[i]}")
-
-    # print("Q-state -> Var")
-    # for i in range(len(VAPOR_agent.legal_qstates)):
-    #     print(f" - {VAPOR_agent.legal_qstates[i]} -> {VAPOR_agent.curr_reward_variance[i]}")
-
     # Plot rewards
     plt.figure(figsize=(10, 5))
     plt.plot(episode_rewards)
@@ -544,7 +537,7 @@ def main_SoftQLEARNING():
     soft_q_agent = SoftQLearning(
         gridworld, terminal_states, alpha=1, temperature=temp_start
     )
-    n_episodes = 10_00
+    n_episodes = 50_000
     max_steps_per_episode = MAX_STEPS_PER_EPISODE
     show_final_path = True
     episode_rewards = []
