@@ -453,6 +453,7 @@ def gui(gridworld, agent, size_gui=640):
         max(10, int(size_image * 0.1))
     )
 
+	rect_surface = pygame.Surface((size_image, size_image), pygame.SRCALPHA)
 
     for_lambdas = {}
 
@@ -561,12 +562,15 @@ def gui(gridworld, agent, size_gui=640):
             (gridworld.agent_pos[0] + 1)
             * size_image
         )
-
+'''
         pygame.draw.rect(
             screen,
             (255, 120, 255, 64),
             player
         )
+'''
+	pygame.draw.rect(rect_surface, (255, 120, 255, 128), (0, 0, size_image, size_image))
+	screen.blit(rect_surface, (player.x, player.y))
 
         pygame.display.flip()
 
