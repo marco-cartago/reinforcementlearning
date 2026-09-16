@@ -157,7 +157,7 @@ def plot_reward_vs_episodes(episode_counts: List[int], results: List[np.ndarray]
 if __name__ == "__main__":
     # Base Configurations
     BASE_SIZE = 10
-    MAX_EPISODES = 250
+    MAX_EPISODES = 50_000
     MAX_STEPS = 2 * (BASE_SIZE + 1)
 
     DEFAULT_CONFIG = GridWorldConfig(
@@ -207,12 +207,12 @@ if __name__ == "__main__":
         "VAPOR": (Vapor, vapor_config)
     }
 
-    for model_name in ["VAPOR"]:
+    for model_name in ["Soft-Q-Learning"]:
         
         model_class, model_config = models_dict[model_name]
 
         # Reward vs Dimension -------------------------------------------------------------------------
-        dimensions = [3] + [dim for dim in range(4, 11, 2)]
+        dimensions = dimensions = [dim for dim in range(3, 20, 2)]
         dim_results = []
         print("Running Dimension Experiment...")
         for d in tqdm(dimensions):
@@ -224,7 +224,8 @@ if __name__ == "__main__":
                 model_config["gridworld"].treasure_pos, 
                 model_config["gridworld"].small_treasure_pos
             ] 
-            model_config["horizon"] = max_steps
+            if model_name == "VAPOR":
+                model_config["horizon"] = MAX_STEPS
 
             res = run_experiment(
                 model_class, 
@@ -245,7 +246,7 @@ if __name__ == "__main__":
         )
 
         # Reward vs Episode Number --------------------------------------------------------------------
-        ep_counts =  [10] + [e for e in range(100, 200, 25)] + [200] + [300]
+        ep_counts =  [10] + [e for e in range(100, 5000 + 251, 250)]
         ep_results = []
         print("Running Episode Count Experiment...")
         for e in tqdm(ep_counts):
@@ -255,7 +256,8 @@ if __name__ == "__main__":
                 model_config["gridworld"].treasure_pos,
                 model_config["gridworld"].small_treasure_pos
             ]
-            model_config["horizon"] = MAX_STEPS
+            if model_name == "VAPOR":
+                model_config["horizon"] = MAX_STEPS
 
             res = run_experiment(
                 model_class, model_config, DEFAULT_CONFIG,
