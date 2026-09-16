@@ -208,10 +208,11 @@ if __name__ == "__main__":
     }
 
     for model_name in ["VAPOR"]:
+        
         model_class, model_config = models_dict[model_name]
 
         # Reward vs Dimension -------------------------------------------------------------------------
-        dimensions = [3] + [dim for dim in range(4, 13, 2)]
+        dimensions = [3] + [dim for dim in range(4, 11, 2)]
         dim_results = []
         print("Running Dimension Experiment...")
         for d in tqdm(dimensions):
@@ -243,30 +244,22 @@ if __name__ == "__main__":
             n_epsiodes=MAX_EPISODES
         )
 
-
         # Reward vs Episode Number --------------------------------------------------------------------
         ep_counts =  [10] + [e for e in range(100, 200, 25)] + [200] + [300]
         ep_results = []
         print("Running Episode Count Experiment...")
         for e in tqdm(ep_counts):
-            cfg = deepcopy(DEFAULT_CONFIG)
-            cfg.size = MAX_EPISODES # Update dimension
-            max_steps = 2*(MAX_EPISODES + 1)
-            model_config["gridworld"] = GridWorld(cfg)
+            # non toccare cfg.size, resta BASE_SIZE
+            model_config["gridworld"] = GridWorld(DEFAULT_CONFIG)
             model_config["terminal_states"] = [
-                model_config["gridworld"].treasure_pos, 
+                model_config["gridworld"].treasure_pos,
                 model_config["gridworld"].small_treasure_pos
-            ] 
-            model_config["horizon"] = max_steps
-
+            ]
+            model_config["horizon"] = MAX_STEPS
 
             res = run_experiment(
-                model_class, 
-                model_config, 
-                DEFAULT_CONFIG, 
-                max_episodes=e, 
-                max_steps=e, 
-                n_simulations=5
+                model_class, model_config, DEFAULT_CONFIG,
+                max_episodes=e, max_steps=MAX_STEPS, n_simulations=5
             )
             ep_results.append(res[:, -1])
 
@@ -293,5 +286,5 @@ if __name__ == "__main__":
         plot_learning_curve(
             learning_data, 
             f"./figures/{model_name}_learning_curve_{time.time_ns()}.png", 
-            "SoftQLearning Convergence over 1000 Episodes"
+            f"{model_name} Convergence over 1000 Episodes"
         )
