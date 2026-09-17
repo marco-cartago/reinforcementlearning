@@ -52,5 +52,5 @@ Unfortunately we were not able to optimise sufficenty the memory usage: the `CVX
 
 We used Claude Sonnet 5 and Gemma 4 31B for:
  - Finding bugs in the implementation of the enviroment
- - Looging for possible optimizations when performing convex optimization in the `Vapor` class.
+ - Looking for possible optimizations when performing convex optimization in the `Vapor` class.
  - Producing visualizations for the enviroment.
